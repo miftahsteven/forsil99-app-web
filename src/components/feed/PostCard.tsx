@@ -22,7 +22,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import { Post, Comment } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { reactToPost, addComment, deletePost } from '@/services/postService';
+import { reactToPost, addComment, deletePost, fetchComments } from '@/services/postService';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge, GoldBadge } from '@/components/ui/VerifiedBadge';
 import { toast } from 'sonner';
@@ -58,11 +58,42 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
   const [showAllCommentsModal, setShowAllCommentsModal] = useState<boolean>(false);
   const [comments, setComments] = useState<Comment[]>(post.comments || []);
   const [commentCount, setCommentCount] = useState<number>(post.commentCount || 0);
+  const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
   const [commentText, setCommentText] = useState<string>('');
   const [modalCommentText, setModalCommentText] = useState<string>('');
   const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
   const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
   const [isSubmittingModalComment, setIsSubmittingModalComment] = useState<boolean>(false);
+
+  const loadCommentsIfEmpty = async () => {
+    if (comments.length === 0 && commentCount > 0) {
+      setIsLoadingComments(true);
+      try {
+        const fetched = await fetchComments(post.id);
+        if (fetched && fetched.length > 0) {
+          setComments(fetched);
+          setCommentCount(fetched.length);
+        }
+      } catch (err) {
+        console.warn('Load comments error:', err);
+      } finally {
+        setIsLoadingComments(false);
+      }
+    }
+  };
+
+  const handleToggleComments = () => {
+    const nextState = !showComments;
+    setShowComments(nextState);
+    if (nextState) {
+      loadCommentsIfEmpty();
+    }
+  };
+
+  const handleOpenAllCommentsModal = () => {
+    setShowAllCommentsModal(true);
+    loadCommentsIfEmpty();
+  };
 
   const [activeMediaIndex, setActiveMediaIndex] = useState<number>(0);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
@@ -445,7 +476,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
             {commentCount > 0 && (
               <button
                 type="button"
-                onClick={() => setShowComments(!showComments)}
+                onClick={handleToggleComments}
                 className="hover:underline text-slate-500 hover:text-brand-primary transition-colors text-xs font-medium cursor-pointer"
               >
                 {commentCount} komentar
@@ -492,7 +523,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
 
         {/* Komentar Button */}
         <button
-          onClick={() => setShowComments(!showComments)}
+          onClick={handleToggleComments}
           className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
         >
           <MessageCircle size={17} />
@@ -514,7 +545,12 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
         <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 animate-in fade-in duration-150">
           {/* Comments List */}
           <div className="space-y-2.5 mb-3">
-            {comments.length === 0 ? (
+            {isLoadingComments ? (
+              <div className="flex items-center justify-center py-4 gap-2 text-xs text-slate-400">
+                <div className="w-4 h-4 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+                <span>Memuat komentar...</span>
+              </div>
+            ) : comments.length === 0 ? (
               <p className="text-xs text-slate-400 text-center py-2">
                 Belum ada komentar. Jadilah yang pertama berkomentar!
               </p>
@@ -594,7 +630,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
                 {hasMoreComments && (
                   <button
                     type="button"
-                    onClick={() => setShowAllCommentsModal(true)}
+                    onClick={handleOpenAllCommentsModal}
                     className="w-full text-center py-2 px-3 text-xs font-semibold text-brand-primary bg-slate-100/90 hover:bg-slate-200/80 rounded-xl transition-all my-1 flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                   >
                     <MessageCircle size={14} />

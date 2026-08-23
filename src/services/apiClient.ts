@@ -3,7 +3,7 @@ const USER_KEY = 'ruang59_web_user';
 const PROFILE_KEY = 'ruang59_web_profile';
 
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001/api/v1';
+  process.env.NEXT_PUBLIC_API_BASE_URL || '/api/v1';
 
 export function getPlatformIdentifier(): string {
   if (typeof window === 'undefined') return 'web';
@@ -74,20 +74,20 @@ export function setCachedUserData(user: any): void {
 
 export function getCandidateBaseUrls(): string[] {
   const candidates: string[] = [];
-  
-  if (typeof window !== 'undefined' && window.location.hostname) {
-    const host = window.location.hostname;
-    candidates.push(`http://${host}:5001/api/v1`);
-  }
 
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     candidates.push(process.env.NEXT_PUBLIC_API_BASE_URL);
   }
 
+  if (typeof window !== 'undefined' && window.location.origin) {
+    candidates.push(`${window.location.origin}/api/v1`);
+  }
+
+  candidates.push('/api/v1');
   candidates.push('http://localhost:5001/api/v1');
   candidates.push('http://127.0.0.1:5001/api/v1');
 
-  return Array.from(new Set(candidates));
+  return Array.from(new Set(candidates.filter(Boolean)));
 }
 
 export async function apiRequest<T = any>(
