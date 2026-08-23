@@ -50,10 +50,6 @@ export default function RegisterPage() {
   useEffect(() => {
     fetchAlumniList().then((data) => {
       setAlumniList(data);
-      if (data.length > 0) {
-        setReferralId(data[0].accountId);
-        setReferralName(data[0].fullName);
-      }
     });
   }, []);
 
@@ -80,12 +76,24 @@ export default function RegisterPage() {
       toast.error('Nama lengkap wajib diisi.');
       return;
     }
+    if (!className) {
+      toast.error('Kelas saat lulus wajib dipilih.');
+      return;
+    }
     if (!phone.trim()) {
       toast.error('Nomor WhatsApp wajib diisi.');
       return;
     }
-    if (!password || password.length < 4) {
-      toast.error('Kata sandi minimal 4 karakter.');
+    if (!password || password.length < 6) {
+      toast.error('Kata sandi minimal 6 karakter.');
+      return;
+    }
+    if (!referralId) {
+      toast.error('Rekan alumni referral (teman seangkatan) wajib dipilih.');
+      return;
+    }
+    if (!selfieBase64) {
+      toast.error('Foto selfie verifikasi wajah wajib diunggah.');
       return;
     }
 
@@ -100,9 +108,9 @@ export default function RegisterPage() {
         email: email.trim() || undefined,
         password,
         graduationYear: 1999,
-        referralAccountId: referralId || undefined,
-        referralName: referralName || undefined,
-        selfieBase64: selfieBase64 || undefined,
+        referralAccountId: referralId,
+        referralName: referralName || 'Rekan Alumni',
+        selfieBase64,
       });
 
       toast.success('Pendaftaran alumni terkirim! Menunggu konfirmasi referral via email.');
@@ -190,45 +198,45 @@ export default function RegisterPage() {
           <AppInput
             label="Kata Sandi Baru"
             type="password"
-            placeholder="Minimal 4 karakter"
+            placeholder="Minimal 6 karakter"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             leftIcon={<Lock size={16} />}
             required
           />
 
-          {/* Referral Selection */}
-          {alumniList.length > 0 && (
-            <div className="space-y-1.5 pt-2 border-t border-slate-100">
-              <label className="block text-xs font-semibold text-slate-700">
-                Pilih Rekan Alumni Sebagai Referensi Verifikasi:
-              </label>
-              <select
-                value={referralId}
-                onChange={handleReferralChange}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-900 focus:border-brand-primary focus:outline-none"
-              >
-                {alumniList.map((a) => (
-                  <option key={a.accountId} value={a.accountId}>
-                    {a.fullName} ({a.className || 'Alumni 99'})
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-slate-400">
-                Rekan alumni terpilih akan menerima notifikasi untuk memvalidasi akun Anda.
-              </p>
-            </div>
-          )}
+          {/* Referral Selection (Wajib) */}
+          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+            <label className="block text-xs font-semibold text-slate-700">
+              Pilih Rekan Alumni Sebagai Referensi Verifikasi: <span className="text-rose-500 font-bold">* (Wajib)</span>
+            </label>
+            <select
+              value={referralId}
+              onChange={handleReferralChange}
+              required
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-900 focus:border-brand-primary focus:outline-none"
+            >
+              <option value="">-- Pilih Rekan Teman Angkatan '99 --</option>
+              {alumniList.map((a) => (
+                <option key={a.accountId} value={a.accountId}>
+                  {a.fullName} ({a.className || 'Alumni 99'})
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400">
+              Rekan alumni terpilih akan menerima notifikasi email untuk memvalidasi keanggotaan Anda.
+            </p>
+          </div>
 
-          {/* Selfie Photo Upload */}
+          {/* Selfie Photo Upload (Wajib) */}
           <div className="pt-2 border-t border-slate-100">
             <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              Foto Selfie Terbaru (Untuk Foto Profil / Verifikasi)
+              Foto Selfie Wajah / Profil: <span className="text-rose-500 font-bold">* (Wajib)</span>
             </label>
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-colors">
                 <Camera size={16} className="text-brand-primary" />
-                <span>Pilih Foto</span>
+                <span>Pilih Foto Selfie</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -236,15 +244,17 @@ export default function RegisterPage() {
                   className="hidden"
                 />
               </label>
-              {selfieBase64 && (
+              {selfieBase64 ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-full overflow-hidden border border-brand-primary">
+                  <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xs">
                     <img src={selfieBase64} alt="Selfie" className="w-full h-full object-cover" />
                   </div>
                   <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
                     <CheckCircle2 size={13} /> Foto siap
                   </span>
                 </div>
+              ) : (
+                <span className="text-[11px] text-rose-500 italic">Belum ada foto</span>
               )}
             </div>
           </div>
