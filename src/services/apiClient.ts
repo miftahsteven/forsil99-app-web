@@ -75,17 +75,23 @@ export function setCachedUserData(user: any): void {
 export function getCandidateBaseUrls(): string[] {
   const candidates: string[] = [];
 
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    candidates.push(process.env.NEXT_PUBLIC_API_BASE_URL);
-  }
-
+  // 1. Same-origin relative path (most reliable for production HTTPS web)
   if (typeof window !== 'undefined' && window.location.origin) {
     candidates.push(`${window.location.origin}/api/v1`);
   }
 
   candidates.push('/api/v1');
-  candidates.push('http://localhost:5001/api/v1');
-  candidates.push('http://127.0.0.1:5001/api/v1');
+
+  // 2. Explicit configured env url
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    candidates.push(process.env.NEXT_PUBLIC_API_BASE_URL);
+  }
+
+  // 3. Local development fallback
+  if (process.env.NODE_ENV === 'development') {
+    candidates.push('http://localhost:5001/api/v1');
+    candidates.push('http://127.0.0.1:5001/api/v1');
+  }
 
   return Array.from(new Set(candidates.filter(Boolean)));
 }
@@ -119,7 +125,7 @@ export async function apiRequest<T = any>(
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ message: `HTTP Error ${response.status}` }));
     if (!response.ok) {
       throw new Error(data.message || `API Error (${response.status})`);
     }
@@ -127,38 +133,45 @@ export async function apiRequest<T = any>(
   }
 
   const candidateUrls = getCandidateBaseUrls();
-  let lastError: any = null;
+  let lastNetworkError: any = null;
 
   for (const baseUrl of candidateUrls) {
     const url = `${baseUrl}${cleanEndpoint}`;
+    let response: Response;
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-      const response = await fetch(url, {
+      response = await fetch(url, {
         method: options.method || 'GET',
         headers,
         body: options.body ? JSON.stringify(options.body) : undefined,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || `API Error (${response.status})`);
-      }
-
-      return data;
-    } catch (err: any) {
-      lastError = err;
-      if (err.message && err.message.startsWith('API Error')) {
-        throw err;
-      }
+    } catch (netErr: any) {
+      lastNetworkError = netErr;
+      continue; // Network failed on this URL, try next candidate
     }
+
+    // Server responded (status 200..599). Parse response:
+    let data: any;
+    try {
+      data = await response.json();
+    } catch {
+      data = { message: `Respon server tidak valid (${response.status})` };
+    }
+
+    if (!response.ok) {
+      // Throw the server's actual error message directly (e.g. "Nomor HP sudah terdaftar", "Foto selfie wajib diunggah", etc.)
+      throw new Error(data.message || `Terjadi kesalahan pada server (${response.status})`);
+    }
+
+    return data;
   }
 
-  throw lastError || new Error('Network request failed');
+  throw lastNetworkError || new Error('Gagal terhubung ke server (Koneksi jaringan bermasalah).');
 }
 
 export const apiClient = {

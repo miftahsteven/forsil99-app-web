@@ -278,36 +278,51 @@ export default function RegisterPage() {
           </div>
 
           {/* Selfie Photo Upload (Wajib: Galeri / Kamera / Drive) */}
-          <div className="pt-2 border-t border-slate-100 space-y-1.5">
+          <div className="pt-2 border-t border-slate-100 space-y-2">
             <label className="block text-xs font-semibold text-slate-700">
               Foto Selfie Wajah / Profil: <span className="text-rose-500 font-bold">* (Wajib)</span>
             </label>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-all border border-slate-200/80 shadow-2xs">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Option 1: Galeri / File HP / Google Drive */}
+              <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-all border border-slate-200 shadow-2xs">
                 <ImageIcon size={16} className="text-brand-primary" />
-                <span>Pilih dari Galeri / Kamera</span>
+                <span>Buka Galeri Foto / File</span>
                 <input
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/jpg,image/heic,image/heif,image/*"
+                  accept="image/*"
                   onChange={handleSelfieUpload}
                   className="hidden"
                 />
               </label>
+
+              {/* Option 2: Kamera Langsung */}
+              <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-all border border-slate-200 shadow-2xs">
+                <Camera size={16} className="text-amber-600" />
+                <span>Ambil Kamera</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  onChange={handleSelfieUpload}
+                  className="hidden"
+                />
+              </label>
+
               {selfieBase64 ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 ml-auto">
                   <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xs">
                     <img src={selfieBase64} alt="Selfie" className="w-full h-full object-cover" />
                   </div>
                   <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                    <CheckCircle2 size={13} /> Foto siap
+                    <CheckCircle2 size={13} /> Foto Siap
                   </span>
                 </div>
               ) : (
-                <span className="text-[11px] text-rose-500 italic">Belum ada foto</span>
+                <span className="text-[11px] text-rose-500 italic ml-auto">Belum ada foto</span>
               )}
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              💡 Mendukung pengambilan dari <strong>Galeri HP</strong>, <strong>Google Drive / Dokumen</strong>, maupun <strong>Kamera langsung</strong>.
+              💡 Pilih <strong>Buka Galeri Foto</strong> untuk memilih foto dari galeri HP / Google Photos / Google Drive, atau <strong>Ambil Kamera</strong> untuk foto langsung.
             </p>
           </div>
 
