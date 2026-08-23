@@ -108,13 +108,6 @@ export default function LoginPage() {
           </AppButton>
         </form>
 
-        {/* Quick Demo Credentials Help */}
-        <div className="mt-4 p-3 bg-blue-50/70 border border-blue-100 rounded-xl text-[11px] text-slate-600">
-          <p className="font-semibold text-brand-primary mb-1">💡 Akun Demo / Alumni 99:</p>
-          <p>No. HP: <code className="bg-white px-1 py-0.5 rounded font-mono text-slate-800">08558833244</code></p>
-          <p>Password: <code className="bg-white px-1 py-0.5 rounded font-mono text-slate-800">B47054ii!</code></p>
-        </div>
-
         {/* Register CTA */}
         <div className="text-center mt-6">
           <p className="text-xs text-slate-600">
