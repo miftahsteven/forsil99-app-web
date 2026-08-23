@@ -61,7 +61,7 @@ export default function LoginPage() {
           </p>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold mt-2">
             <Sparkles size={12} />
-            <span>Khusus Angkatan 1999 (Perak)</span>
+            <span>Khusus Angkatan 1999 </span>
           </div>
         </div>
 
