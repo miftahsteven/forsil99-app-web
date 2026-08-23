@@ -54,24 +54,32 @@ export async function loginWithEmailOrPhone(identifier: string, pass: string) {
  */
 export async function registerAlumniUser(payload: {
   fullName: string;
+  nickname?: string;
   className: string;
   phone?: string;
   email?: string;
   password: string;
   graduationYear?: number;
+  referralAccountId?: string;
+  referralName?: string;
+  selfieBase64?: string;
 }) {
   const platform = getPlatformIdentifier();
   const res = await apiClient.post('/auth/register', {
     fullName: payload.fullName,
+    nickname: payload.nickname,
     className: payload.className,
     phoneNumber: payload.phone,
     email: payload.email,
     password: payload.password,
     graduationYear: payload.graduationYear || 1999,
+    referralAccountId: payload.referralAccountId,
+    referralName: payload.referralName,
+    selfieBase64: payload.selfieBase64,
     platform,
   });
 
-  if (res.token) {
+  if (res.token && res.user?.verificationStatus === 'approved') {
     setAccessToken(res.token);
   }
   if (res.user) {

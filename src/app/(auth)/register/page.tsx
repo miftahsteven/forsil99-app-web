@@ -91,32 +91,22 @@ export default function RegisterPage() {
 
     setIsLoading(true);
     try {
-      // 1. Direct register to create account
-      const regRes = await registerAlumniUser({
+      // 1. Direct register to create account (pending review & referral email dispatch)
+      await registerAlumniUser({
         fullName: fullName.trim(),
+        nickname: nickname.trim() || undefined,
         className,
         phone: phone.trim(),
         email: email.trim() || undefined,
         password,
         graduationYear: 1999,
+        referralAccountId: referralId || undefined,
+        referralName: referralName || undefined,
+        selfieBase64: selfieBase64 || undefined,
       });
 
-      // 2. Submit referral verification if available
-      if (referralId) {
-        await submitAlumniRegistration({
-          googleEmail: email.trim() || `${phone.replace(/[^0-9]/g, '')}@sman59.sch.id`,
-          fullName: fullName.trim(),
-          nickname: nickname.trim() || undefined,
-          className,
-          whatsapp: phone.trim(),
-          referralAccountId: referralId,
-          referralName: referralName || 'Rekan Alumni',
-          selfieBase64: selfieBase64 || undefined,
-        }).catch(() => {});
-      }
-
-      toast.success('Pendaftaran alumni berhasil! Selamat datang di Forsil99.');
-      router.push('/');
+      toast.success('Pendaftaran alumni terkirim! Menunggu konfirmasi referral via email.');
+      router.push('/awaiting-approval');
     } catch (err: any) {
       toast.error(err.message || 'Pendaftaran gagal. Silakan periksa data Anda.');
     } finally {
