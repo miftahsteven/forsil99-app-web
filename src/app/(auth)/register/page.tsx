@@ -13,6 +13,7 @@ import {
   Mail,
   Lock,
   Camera,
+  ImageIcon,
   Users,
   CheckCircle2,
   AlertCircle,
@@ -53,14 +54,62 @@ export default function RegisterPage() {
     });
   }, []);
 
-  const handleSelfieUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const rawData = event.target?.result as string;
+        const img = new window.Image();
+        img.onload = () => {
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(rawData);
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.82);
+          resolve(compressed);
+        };
+        img.onerror = () => resolve(rawData);
+        img.src = rawData;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleSelfieUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setSelfieBase64(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressedBase64 = await compressImageFile(file);
+      if (compressedBase64) {
+        setSelfieBase64(compressedBase64);
+        toast.success('Foto berhasil dimuat!');
+      }
+    } catch {
+      toast.error('Gagal memuat foto.');
+    }
   };
 
   const handleReferralChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -228,25 +277,25 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {/* Selfie Photo Upload (Wajib) */}
-          <div className="pt-2 border-t border-slate-100">
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+          {/* Selfie Photo Upload (Wajib: Galeri / Kamera / Drive) */}
+          <div className="pt-2 border-t border-slate-100 space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700">
               Foto Selfie Wajah / Profil: <span className="text-rose-500 font-bold">* (Wajib)</span>
             </label>
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-colors">
-                <Camera size={16} className="text-brand-primary" />
-                <span>Pilih Foto Selfie</span>
+              <label className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-all border border-slate-200/80 shadow-2xs">
+                <ImageIcon size={16} className="text-brand-primary" />
+                <span>Pilih dari Galeri / Kamera</span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp,image/jpg,image/heic,image/heif,image/*"
                   onChange={handleSelfieUpload}
                   className="hidden"
                 />
               </label>
               {selfieBase64 ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xs">
+                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xs">
                     <img src={selfieBase64} alt="Selfie" className="w-full h-full object-cover" />
                   </div>
                   <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
@@ -257,6 +306,9 @@ export default function RegisterPage() {
                 <span className="text-[11px] text-rose-500 italic">Belum ada foto</span>
               )}
             </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              💡 Mendukung pengambilan dari <strong>Galeri HP</strong>, <strong>Google Drive / Dokumen</strong>, maupun <strong>Kamera langsung</strong>.
+            </p>
           </div>
 
           <AppButton
