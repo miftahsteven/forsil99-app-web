@@ -118,9 +118,9 @@ export async function fetchCurrentUserData(): Promise<{
 }
 
 /**
- * Fetch list of verified alumni for Referral selection
+ * Fetch list of verified alumni for Referral selection (with optional search query)
  */
-export async function fetchAlumniList(): Promise<
+export async function fetchAlumniList(query?: string): Promise<
   {
     accountId: string;
     fullName: string;
@@ -130,7 +130,10 @@ export async function fetchAlumniList(): Promise<
   }[]
 > {
   try {
-    const res = await apiClient.get('/alumni-registration/alumni-list');
+    const endpoint = query && query.trim().length > 0
+      ? `/alumni-registration/alumni-list?q=${encodeURIComponent(query.trim())}`
+      : '/alumni-registration/alumni-list';
+    const res = await apiClient.get(endpoint);
     return res.alumni || [];
   } catch {
     return [];

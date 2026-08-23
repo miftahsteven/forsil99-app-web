@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
-import { fetchAlumniList, registerAlumniUser, submitAlumniRegistration } from '@/services/authService';
+import { fetchAlumniList, registerAlumniUser } from '@/services/authService';
 import {
   User,
   Phone,
@@ -17,6 +17,9 @@ import {
   Users,
   CheckCircle2,
   AlertCircle,
+  Search,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -41,18 +44,62 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  
+  // Referral Search State
+  const [referralQuery, setReferralQuery] = useState<string>('');
   const [referralId, setReferralId] = useState<string>('');
   const [referralName, setReferralName] = useState<string>('');
+  const [selectedReferral, setSelectedReferral] = useState<any | null>(null);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [hasSearched, setHasSearched] = useState<boolean>(false);
+
   const [selfieBase64, setSelfieBase64] = useState<string>('');
-  
-  const [alumniList, setAlumniList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  // Search referral when query length >= 3
   useEffect(() => {
-    fetchAlumniList().then((data) => {
-      setAlumniList(data);
-    });
-  }, []);
+    const q = referralQuery.trim();
+    if (q.length < 3) {
+      setSearchResults([]);
+      setIsSearching(false);
+      setHasSearched(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const data = await fetchAlumniList(q);
+        setSearchResults(data);
+        setHasSearched(true);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [referralQuery]);
+
+  const handleSelectReferral = (alumni: any) => {
+    setReferralId(alumni.accountId);
+    setReferralName(alumni.fullName);
+    setSelectedReferral(alumni);
+    setReferralQuery('');
+    setSearchResults([]);
+    setHasSearched(false);
+  };
+
+  const handleClearReferral = () => {
+    setReferralId('');
+    setReferralName('');
+    setSelectedReferral(null);
+    setReferralQuery('');
+    setSearchResults([]);
+    setHasSearched(false);
+  };
 
   const compressImageFile = (file: File): Promise<string> => {
     return new Promise((resolve) => {
@@ -112,13 +159,6 @@ export default function RegisterPage() {
     }
   };
 
-  const handleReferralChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = e.target.value;
-    setReferralId(id);
-    const found = alumniList.find((a) => a.accountId === id);
-    if (found) setReferralName(found.fullName);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
@@ -138,7 +178,7 @@ export default function RegisterPage() {
       return;
     }
     if (!referralId) {
-      toast.error('Rekan alumni referral (teman seangkatan) wajib dipilih.');
+      toast.error('Rekan alumni referral (teman seangkatan) wajib dicari dan dipilih.');
       return;
     }
     if (!selfieBase64) {
@@ -254,27 +294,125 @@ export default function RegisterPage() {
             required
           />
 
-          {/* Referral Selection (Wajib) */}
-          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+          {/* Referral Selection (Wajib: Cari Rekan Seangkatan Min 3 Huruf) */}
+          <div className="space-y-2 pt-2 border-t border-slate-100">
             <label className="block text-xs font-semibold text-slate-700">
               Pilih Rekan Alumni Sebagai Referensi Verifikasi: <span className="text-rose-500 font-bold">* (Wajib)</span>
             </label>
-            <select
-              value={referralId}
-              onChange={handleReferralChange}
-              required
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-900 focus:border-brand-primary focus:outline-none"
-            >
-              <option value="">-- Pilih Rekan Teman Angkatan '99 --</option>
-              {alumniList.map((a) => (
-                <option key={a.accountId} value={a.accountId}>
-                  {a.fullName} ({a.className || 'Alumni 99'})
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-slate-400">
-              Rekan alumni terpilih akan menerima notifikasi email untuk memvalidasi keanggotaan Anda.
-            </p>
+
+            {selectedReferral ? (
+              /* Selected Referral Card */
+              <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white border border-emerald-300 flex items-center justify-center overflow-hidden flex-shrink-0 text-emerald-700 font-bold text-xs">
+                    {selectedReferral.profilePhotoUrl ? (
+                      <img
+                        src={selectedReferral.profilePhotoUrl}
+                        alt={selectedReferral.fullName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span>{selectedReferral.fullName?.substring(0, 2).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-900">{selectedReferral.fullName}</span>
+                      <CheckCircle2 size={13} className="text-emerald-600 flex-shrink-0" />
+                    </div>
+                    <p className="text-[11px] text-emerald-700 font-medium">
+                      {selectedReferral.className || 'Alumni 99'} • Referral Terpilih
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleClearReferral}
+                  className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-rose-600 bg-white border border-slate-200 rounded-lg hover:bg-rose-50 transition-colors"
+                >
+                  Ganti Rekan
+                </button>
+              </div>
+            ) : (
+              /* Search Input Combobox */
+              <div className="space-y-1.5 relative">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={referralQuery}
+                    onChange={(e) => setReferralQuery(e.target.value)}
+                    placeholder="Ketik minimal 3 huruf nama rekan seangkatan '99..."
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 py-2.5 text-xs text-slate-900 focus:border-brand-primary focus:outline-none placeholder:text-slate-400"
+                  />
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  {isSearching && (
+                    <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-primary animate-spin" />
+                  )}
+                  {referralQuery && !isSearching && (
+                    <button
+                      type="button"
+                      onClick={() => setReferralQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Search Hint when < 3 characters */}
+                {referralQuery.trim().length > 0 && referralQuery.trim().length < 3 && (
+                  <p className="text-[11px] text-amber-600 italic px-1">
+                    ✍️ Masukkan minimal 3 huruf untuk mencari teman seangkatan (misal: "Stev", "Budi", "Rina").
+                  </p>
+                )}
+
+                {/* Dropdown Results */}
+                {referralQuery.trim().length >= 3 && !isSearching && (
+                  <div className="mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg divide-y divide-slate-100 z-30">
+                    {searchResults.length > 0 ? (
+                      searchResults.map((a) => (
+                        <button
+                          key={a.accountId}
+                          type="button"
+                          onClick={() => handleSelectReferral(a)}
+                          className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50/80 active:bg-blue-100 flex items-center justify-between transition-colors group"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center text-[10px] font-bold text-slate-600">
+                              {a.profilePhotoUrl ? (
+                                <img src={a.profilePhotoUrl} alt={a.fullName} className="w-full h-full object-cover" />
+                              ) : (
+                                <span>{a.fullName?.substring(0, 2).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900 group-hover:text-brand-primary transition-colors">
+                                {a.fullName}
+                              </p>
+                              <p className="text-[10px] text-slate-500">
+                                {a.className || 'Alumni 1999'}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-semibold text-brand-primary bg-blue-50 group-hover:bg-brand-primary group-hover:text-white px-2 py-1 rounded-md transition-all">
+                            Pilih Rekan
+                          </span>
+                        </button>
+                      ))
+                    ) : hasSearched ? (
+                      <div className="p-3 text-center text-xs text-slate-500">
+                        Tidak ditemukan alumni dengan nama "<strong>{referralQuery}</strong>". Pastikan ejaan nama teman seangkatan Anda benar.
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
+                <p className="text-[11px] text-slate-400">
+                  Rekan alumni terpilih akan menerima notifikasi email untuk memvalidasi keanggotaan Anda.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Selfie Photo Upload (Wajib: Galeri / Kamera / Drive) */}
