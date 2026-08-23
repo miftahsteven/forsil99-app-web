@@ -42,23 +42,50 @@ export default function ChatRoomPage() {
   const initChat = async () => {
     setIsLoading(true);
     try {
-      // 1. Fetch other user profile
-      const prof = await fetchProfileById(targetId);
-      if (prof) setTargetProfile(prof);
-
-      // 2. Start / Get Thread
+      // 1. Start / Get Thread
       const thread = await startDirectChat(targetId);
       if (thread && thread.id) {
         setThreadId(thread.id);
+        if (thread.otherUser) {
+          setTargetProfile({
+            uid: thread.otherUser.uid,
+            fullName: thread.otherUser.name,
+            profilePhotoUrl: thread.otherUser.photoUrl,
+            className: thread.otherUser.className,
+            graduationYear: 1999,
+          } as any);
+        }
         const msgs = await fetchThreadMessages(thread.id);
         setMessages(msgs);
       }
-    } catch {
+
+      // 2. Fetch full profile in background
+      fetchProfileById(targetId)
+        .then((prof) => {
+          if (prof) setTargetProfile(prof);
+        })
+        .catch(() => {});
+    } catch (err: any) {
+      console.warn('Init chat error:', err);
       toast.error('Gagal memuat ruang obrolan.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Real-time polling for incoming messages
+  useEffect(() => {
+    if (!threadId) return;
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await fetchThreadMessages(threadId);
+        if (fresh && fresh.length > 0) {
+          setMessages(fresh);
+        }
+      } catch {}
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [threadId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

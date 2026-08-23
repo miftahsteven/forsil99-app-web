@@ -12,7 +12,10 @@ export async function fetchChatThreads(): Promise<ChatThread[]> {
 }
 
 export async function startDirectChat(targetUserId: string): Promise<ChatThread> {
-  const res = await apiClient.post('/chat/start', { targetUserId });
+  const res = await apiClient.post('/chat/start', {
+    targetUserId,
+    targetAccountId: targetUserId,
+  });
   return res.thread;
 }
 
@@ -34,6 +37,7 @@ export async function sendMessage(
   const res = await apiClient.post(`/chat/threads/${threadId}/messages`, {
     text,
     imageUrl,
+    mediaUrl: imageUrl,
   });
   return res.chatMessage || res.message;
 }
