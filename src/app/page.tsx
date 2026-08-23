@@ -9,6 +9,7 @@ import { fetchPosts } from '@/services/postService';
 import { Post } from '@/types';
 import { Sparkles, RefreshCw, MessageSquareDashed } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
 
 const FILTER_TABS = [
   { id: 'all', label: 'Semua' },
@@ -19,12 +20,14 @@ const FILTER_TABS = [
 ];
 
 export default function HomePage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState<string>('all');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   const loadPosts = async (tab = activeTab) => {
+    if (!isAuthenticated) return;
     setIsLoading(true);
     try {
       const data = await fetchPosts(tab);
@@ -40,8 +43,10 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    loadPosts(activeTab);
-  }, [activeTab]);
+    if (isAuthenticated) {
+      loadPosts(activeTab);
+    }
+  }, [activeTab, isAuthenticated]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
