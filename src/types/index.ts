@@ -67,6 +67,7 @@ export interface AlumniProfile {
     followers?: number;
     following?: number;
   };
+  isFollowing?: boolean;
 }
 
 export type PostType = 'standard' | 'memory' | 'announcement' | 'help' | 'event' | 'shop_share';
@@ -314,3 +315,34 @@ export interface AlumniRegistration {
   submittedAt: string;
   reviewedAt?: string;
 }
+
+export interface MemorialPrayer {
+  id: string;
+  deceasedId: string;
+  authorId: string;
+  authorName: string;
+  authorNickname?: string;
+  authorPhotoUrl?: string;
+  authorClass?: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface DeceasedAlumni {
+  id: string;
+  fullName: string;
+  nickname?: string;
+  className?: string;
+  photoUrl?: string;
+  passedAwayYear: number;
+  passedAwayDate?: string;
+  bio?: string;
+  createdById?: string;
+  flowerCount: number;
+  prayerCount: number;
+  hasGivenFlower?: boolean;
+  flowerExpiresAt?: string | null;
+  recentPrayers?: MemorialPrayer[];
+  prayers?: MemorialPrayer[];
+}
+

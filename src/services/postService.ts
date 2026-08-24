@@ -1,15 +1,32 @@
 import { apiClient } from './apiClient';
 import { Post, Comment, PostType, ProfileVisibility } from '@/types';
 
-export async function fetchPosts(category?: string): Promise<Post[]> {
+export async function fetchPosts(category?: string, authorId?: string): Promise<Post[]> {
   try {
-    const url = category && category !== 'all' ? `/posts?type=${category}` : '/posts';
+    const params = new URLSearchParams();
+    if (category && category !== 'all') {
+      params.append('type', category);
+    }
+    if (authorId && authorId.trim().length > 0) {
+      params.append('authorId', authorId.trim());
+    }
+    const queryString = params.toString();
+    const url = queryString ? `/posts?${queryString}` : '/posts';
     const res = await apiClient.get(url);
     return res.posts || [];
   } catch (err) {
     console.warn('Fetch posts error:', err);
     return [];
   }
+}
+
+export async function reportPost(payload: {
+  targetId: string;
+  targetType?: string;
+  category: string;
+  description?: string;
+}): Promise<any> {
+  return await apiClient.post('/reports', payload);
 }
 
 export async function fetchPostById(id: string): Promise<Post | null> {

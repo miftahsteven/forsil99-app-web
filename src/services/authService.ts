@@ -19,6 +19,7 @@ export function normalizeProfile(profile: any): AlumniProfile | null {
     uid: userIdentifier,
     accountId: userIdentifier,
     userId: userIdentifier,
+    isFollowing: typeof profile.isFollowing === 'boolean' ? profile.isFollowing : undefined,
   };
 }
 
@@ -240,6 +241,36 @@ export async function fetchFollowStatus(targetUserId: string) {
     return await apiClient.get(`/profiles/${targetUserId}/follow-status`);
   } catch {
     return null;
+  }
+}
+
+/**
+ * Fetch list of followers for a user
+ */
+export async function fetchFollowers(targetUserId: string): Promise<AlumniProfile[]> {
+  try {
+    const res = await apiClient.get(`/profiles/${targetUserId}/followers`);
+    if (res && Array.isArray(res.followers)) {
+      return res.followers.map(normalizeProfile).filter(Boolean) as AlumniProfile[];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch list of following for a user
+ */
+export async function fetchFollowing(targetUserId: string): Promise<AlumniProfile[]> {
+  try {
+    const res = await apiClient.get(`/profiles/${targetUserId}/following`);
+    if (res && Array.isArray(res.following)) {
+      return res.following.map(normalizeProfile).filter(Boolean) as AlumniProfile[];
+    }
+    return [];
+  } catch {
+    return [];
   }
 }
 

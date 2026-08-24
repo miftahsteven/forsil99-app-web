@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MessageSquare, UserPlus, UserCheck, MapPin, Briefcase } from 'lucide-react';
 import { AlumniProfile } from '@/types';
@@ -17,26 +17,44 @@ interface AlumniCardProps {
 
 export function AlumniCard({ alumni, isFollowingInitial = false }: AlumniCardProps) {
   const { user, profile, isAuthenticated } = useAuth();
-  const [isFollowing, setIsFollowing] = useState<boolean>(isFollowingInitial);
+  const [isFollowing, setIsFollowing] = useState<boolean>(
+    alumni.isFollowing !== undefined ? alumni.isFollowing : isFollowingInitial
+  );
   const [isUpdatingFollow, setIsUpdatingFollow] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (alumni.isFollowing !== undefined) {
+      setIsFollowing(alumni.isFollowing);
+    }
+  }, [alumni.isFollowing]);
 
   const targetId = alumni.uid || alumni.userId || alumni.accountId || alumni.id || '';
   const isMe = user?.id === targetId || profile?.uid === targetId;
 
   const handleFollowClick = async (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+
     if (!isAuthenticated) {
       toast.error('Silakan masuk terlebih dahulu.');
       return;
     }
     if (!targetId) return;
 
+    // Warning confirmation before unfollowing
+    if (isFollowing) {
+      const confirmed = window.confirm(
+        `Apakah Anda yakin ingin berhenti mengikuti ${alumni.fullName}?`
+      );
+      if (!confirmed) return;
+    }
+
     setIsUpdatingFollow(true);
     try {
       const res: any = await toggleFollow(targetId);
       if (res && typeof res.isFollowing === 'boolean') {
         setIsFollowing(res.isFollowing);
-        toast.success(res.isFollowing ? `Mengikuti ${alumni.fullName}` : `Berhenti mengikuti`);
+        toast.success(res.isFollowing ? `Mulai mengikuti ${alumni.fullName}` : `Berhenti mengikuti ${alumni.fullName}`);
       } else {
         setIsFollowing(!isFollowing);
       }
@@ -102,19 +120,30 @@ export function AlumniCard({ alumni, isFollowingInitial = false }: AlumniCardPro
             <button
               onClick={handleFollowClick}
               disabled={isUpdatingFollow}
-              className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all active:scale-95 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
                 isFollowing
-                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  : 'bg-brand-primary text-white hover:bg-brand-primaryDark shadow-sm'
+                  ? 'bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-slate-200'
+                  : 'bg-brand-primary text-white hover:bg-brand-primaryDark shadow-xs'
               }`}
-              title={isFollowing ? 'Mengikuti' : 'Ikuti Alumni'}
+              title={isFollowing ? 'Klik untuk berhenti mengikuti' : 'Ikuti Alumni'}
             >
-              {isFollowing ? <UserCheck size={16} /> : <UserPlus size={16} />}
+              {isFollowing ? (
+                <>
+                  <UserCheck size={14} className="text-emerald-600" />
+                  <span className="hidden sm:inline">Mengikuti</span>
+                  <span className="sm:hidden">Diikuti</span>
+                </>
+              ) : (
+                <>
+                  <UserPlus size={14} />
+                  <span>+ Ikuti</span>
+                </>
+              )}
             </button>
 
             <Link
               href={`/chat/${targetId}`}
-              className="p-2 rounded-xl bg-blue-50 text-brand-primary hover:bg-blue-100 transition-colors"
+              className="p-2 rounded-xl bg-blue-50 text-brand-primary hover:bg-blue-100 transition-colors cursor-pointer"
               title="Kirim Pesan Langsung"
             >
               <MessageSquare size={16} />

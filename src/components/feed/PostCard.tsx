@@ -17,12 +17,15 @@ import {
   ThumbsUp,
   Smile,
   CornerDownRight,
+  Flag,
+  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 import { Post, Comment } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { reactToPost, addComment, deletePost, fetchComments } from '@/services/postService';
+import { reactToPost, addComment, deletePost, fetchComments, reportPost } from '@/services/postService';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge, GoldBadge } from '@/components/ui/VerifiedBadge';
 import { toast } from 'sonner';
@@ -65,6 +68,15 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
   const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
   const [isSubmittingModalComment, setIsSubmittingModalComment] = useState<boolean>(false);
 
+  // Report & Action menu states
+  const [showMenuDropdown, setShowMenuDropdown] = useState<boolean>(false);
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [reportCategory, setReportCategory] = useState<
+    'spam' | 'fraud' | 'harassment' | 'sensitive_content' | 'other'
+  >('spam');
+  const [reportDescription, setReportDescription] = useState<string>('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
+
   const loadCommentsIfEmpty = async () => {
     if (comments.length === 0 && commentCount > 0) {
       setIsLoadingComments(true);
@@ -96,6 +108,8 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
   };
 
   const [activeMediaIndex, setActiveMediaIndex] = useState<number>(0);
+  const [showLightboxModal, setShowLightboxModal] = useState<boolean>(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number>(0);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const authorProfile = post.author?.profile;
@@ -234,6 +248,32 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
     }
   };
 
+  // Handle report submission
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      toast.error('Silakan masuk terlebih dahulu.');
+      return;
+    }
+
+    setIsSubmittingReport(true);
+    try {
+      await reportPost({
+        targetId: post.id,
+        targetType: 'post',
+        category: reportCategory,
+        description: reportDescription.trim() || undefined,
+      });
+      setShowReportModal(false);
+      setReportDescription('');
+      toast.success('Laporan Anda berhasil dikirim dan akan segera ditinjau oleh tim moderasi.');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengirim laporan.');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   const hasMedia = Boolean(
     (post.media && post.media.length > 0) ||
     (post.memoryMeta?.isThenAndNow && (post.memoryMeta.thenPhotoUrl || post.memoryMeta.nowPhotoUrl))
@@ -279,7 +319,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
         </div>
 
         {/* Post category badge or options */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 relative">
           {post.type === 'memory' && (
             <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
               <Sparkles size={11} />
@@ -287,16 +327,64 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
             </span>
           )}
 
-          {canDelete && (
+          {/* 3-Dots Menu Dropdown */}
+          <div className="relative">
             <button
-              onClick={handleDeletePost}
-              disabled={isDeleting}
-              className="p-1.5 text-slate-400 hover:text-rose-600 rounded-full hover:bg-rose-50 transition-colors"
-              title="Hapus postingan"
+              onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Pilihan postingan"
             >
-              <Trash2 size={16} />
+              <MoreHorizontal size={18} />
             </button>
-          )}
+
+            {showMenuDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-30"
+                  onClick={() => setShowMenuDropdown(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-1.5 z-40 animate-fadeIn">
+                  <button
+                    onClick={() => {
+                      setShowMenuDropdown(false);
+                      handleShare();
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Share2 size={14} className="text-slate-400" />
+                    <span>Bagikan Tautan</span>
+                  </button>
+
+                  {!isOwner && (
+                    <button
+                      onClick={() => {
+                        setShowMenuDropdown(false);
+                        setShowReportModal(true);
+                      }}
+                      className="w-full px-3.5 py-2 text-left text-xs font-semibold text-amber-700 hover:bg-amber-50 flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <Flag size={14} className="text-amber-500" />
+                      <span>Laporkan Postingan</span>
+                    </button>
+                  )}
+
+                  {canDelete && (
+                    <button
+                      onClick={() => {
+                        setShowMenuDropdown(false);
+                        handleDeletePost();
+                      }}
+                      disabled={isDeleting}
+                      className="w-full px-3.5 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors cursor-pointer border-t border-slate-50"
+                    >
+                      <Trash2 size={14} className="text-rose-500" />
+                      <span>Hapus Postingan</span>
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -315,7 +403,7 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
         </div>
       )}
 
-      {/* 3. Media: Nostalgia Then & Now or Carousel */}
+      {/* 3. Media: Nostalgia Then & Now or Proportional Multi-Image Grid */}
       {post.memoryMeta?.isThenAndNow && (post.memoryMeta.thenPhotoUrl || post.memoryMeta.nowPhotoUrl) ? (
         <div className="px-3 pb-3">
           <div className="grid grid-cols-2 gap-2 rounded-xl overflow-hidden bg-slate-50 p-2 border border-slate-100">
@@ -323,11 +411,19 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
               <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full mb-1.5">
                 DULU ({post.memoryMeta.year || 1999})
               </span>
-              <div className="w-full h-48 rounded-lg overflow-hidden bg-slate-200">
+              <div
+                className="w-full h-48 rounded-lg overflow-hidden bg-slate-200 cursor-pointer"
+                onClick={() => {
+                  if (post.memoryMeta?.thenPhotoUrl) {
+                    setLightboxIndex(0);
+                    setShowLightboxModal(true);
+                  }
+                }}
+              >
                 <img
                   src={post.memoryMeta.thenPhotoUrl}
                   alt="Dulu"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                 />
               </div>
             </div>
@@ -335,63 +431,137 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
               <span className="text-[10px] font-bold text-blue-900 bg-blue-100 px-2 py-0.5 rounded-full mb-1.5">
                 SEKARANG (2026)
               </span>
-              <div className="w-full h-48 rounded-lg overflow-hidden bg-slate-200">
+              <div
+                className="w-full h-48 rounded-lg overflow-hidden bg-slate-200 cursor-pointer"
+                onClick={() => {
+                  if (post.memoryMeta?.nowPhotoUrl) {
+                    setLightboxIndex(post.memoryMeta.thenPhotoUrl ? 1 : 0);
+                    setShowLightboxModal(true);
+                  }
+                }}
+              >
                 <img
                   src={post.memoryMeta.nowPhotoUrl}
                   alt="Sekarang"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                 />
               </div>
             </div>
           </div>
         </div>
       ) : post.media && post.media.length > 0 ? (
-        <div className="relative bg-slate-950 w-full overflow-hidden">
-          {post.media[activeMediaIndex]?.type === 'video' ? (
-            <video
-              src={post.media[activeMediaIndex]?.url}
-              controls
-              playsInline
-              className="w-full max-h-[480px] object-contain mx-auto"
-            />
-          ) : (
-            <img
-              src={post.media[activeMediaIndex]?.url}
-              alt="Media postingan"
-              className="w-full max-h-[500px] object-contain mx-auto"
-            />
-          )}
-
-          {/* Multi-image indicators and arrows */}
-          {post.media.length > 1 && (
-            <>
-              {activeMediaIndex > 0 && (
-                <button
-                  onClick={() => setActiveMediaIndex(activeMediaIndex - 1)}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"
-                >
-                  <ChevronLeft size={18} />
-                </button>
+        <div className="px-3 pb-3">
+          {/* Case 1: Single Media item */}
+          {post.media.length === 1 ? (
+            <div
+              className="rounded-xl overflow-hidden bg-slate-900 cursor-pointer max-h-[460px] flex items-center justify-center border border-slate-100"
+              onClick={() => {
+                if (post.media![0].type !== 'video') {
+                  setLightboxIndex(0);
+                  setShowLightboxModal(true);
+                }
+              }}
+            >
+              {post.media[0].type === 'video' ? (
+                <video
+                  src={post.media[0].url}
+                  controls
+                  playsInline
+                  className="w-full max-h-[460px] object-contain mx-auto"
+                />
+              ) : (
+                <img
+                  src={post.media[0].url}
+                  alt="Media postingan"
+                  className="w-full max-h-[460px] object-cover hover:scale-[1.01] transition-transform"
+                />
               )}
-              {activeMediaIndex < post.media.length - 1 && (
-                <button
-                  onClick={() => setActiveMediaIndex(activeMediaIndex + 1)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"
+            </div>
+          ) : post.media.length === 2 ? (
+            /* Case 2: 2 items side-by-side grid */
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden h-56 sm:h-72">
+              {post.media.map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    setLightboxIndex(idx);
+                    setShowLightboxModal(true);
+                  }}
+                  className="relative w-full h-full bg-slate-100 overflow-hidden cursor-pointer group"
                 >
-                  <ChevronRight size={18} />
-                </button>
-              )}
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/40 px-2 py-1 rounded-full">
-                {post.media.map((_, i) => (
-                  <span
-                    key={i}
-                    className={`w-1.5 h-1.5 rounded-full transition-all ${
-                      i === activeMediaIndex ? 'bg-white w-3' : 'bg-white/50'
-                    }`}
+                  <img
+                    src={item.url}
+                    alt={`Foto ${idx + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
+                </div>
+              ))}
+            </div>
+          ) : post.media.length === 3 ? (
+            /* Case 3: 3 items - 1 large left, 2 stacked right */
+            <div className="grid grid-cols-3 gap-1.5 rounded-xl overflow-hidden h-64 sm:h-80">
+              <div
+                onClick={() => {
+                  setLightboxIndex(0);
+                  setShowLightboxModal(true);
+                }}
+                className="col-span-2 relative w-full h-full bg-slate-100 overflow-hidden cursor-pointer group"
+              >
+                <img
+                  src={post.media[0].url}
+                  alt="Foto 1"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+              </div>
+              <div className="col-span-1 grid grid-rows-2 gap-1.5 h-full">
+                {post.media.slice(1, 3).map((item, idx) => (
+                  <div
+                    key={idx + 1}
+                    onClick={() => {
+                      setLightboxIndex(idx + 1);
+                      setShowLightboxModal(true);
+                    }}
+                    className="relative w-full h-full bg-slate-100 overflow-hidden cursor-pointer group"
+                  >
+                    <img
+                      src={item.url}
+                      alt={`Foto ${idx + 2}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
                 ))}
               </div>
-            </>
+            </div>
+          ) : (
+            /* Case 4: 4+ items - 2x2 grid with overlay on 4th image */
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden h-64 sm:h-80">
+              {post.media.slice(0, 4).map((item, idx) => {
+                const isFourthAndMore = idx === 3 && post.media!.length > 4;
+                const remainingCount = post.media!.length - 3;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setLightboxIndex(idx);
+                      setShowLightboxModal(true);
+                    }}
+                    className="relative w-full h-full bg-slate-100 overflow-hidden cursor-pointer group"
+                  >
+                    <img
+                      src={item.url}
+                      alt={`Foto ${idx + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {isFourthAndMore && (
+                      <div className="absolute inset-0 bg-slate-900/65 flex flex-col items-center justify-center text-white backdrop-blur-[2px] transition-all group-hover:bg-slate-900/75">
+                        <span className="text-xl sm:text-2xl font-black tracking-wide">+{remainingCount}</span>
+                        <span className="text-[11px] font-medium text-slate-200">Foto Lainnya</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       ) : null}
@@ -929,6 +1099,208 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
                 </Link>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Viewer Modal for Zoom and Navigation */}
+      {showLightboxModal && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-2 sm:p-4 backdrop-blur-md">
+          <div className="relative w-full max-w-3xl h-[85vh] max-h-[720px] flex flex-col items-center justify-between">
+            {/* Top Bar */}
+            <div className="w-full flex items-center justify-between text-white px-2 py-3 z-10">
+              <div className="text-xs font-semibold text-slate-300">
+                {post.media && post.media.length > 0 ? `${lightboxIndex + 1} / ${post.media.length}` : 'Foto Nostalgia'}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLightboxModal(false)}
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Media Content */}
+            <div className="flex-1 w-full flex items-center justify-center overflow-hidden relative">
+              {post.memoryMeta?.isThenAndNow ? (
+                <div className="max-h-full max-w-full flex items-center justify-center">
+                  <img
+                    src={lightboxIndex === 0 ? post.memoryMeta.thenPhotoUrl : post.memoryMeta.nowPhotoUrl}
+                    alt={lightboxIndex === 0 ? 'Foto Dulu' : 'Foto Sekarang'}
+                    className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
+                  />
+                </div>
+              ) : post.media && post.media[lightboxIndex] ? (
+                post.media[lightboxIndex].type === 'video' ? (
+                  <video
+                    src={post.media[lightboxIndex].url}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="max-h-full max-w-full object-contain"
+                  />
+                ) : (
+                  <img
+                    src={post.media[lightboxIndex].url}
+                    alt={`Preview ${lightboxIndex + 1}`}
+                    className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
+                  />
+                )
+              ) : null}
+
+              {/* Navigation buttons */}
+              {post.media && post.media.length > 1 && (
+                <>
+                  {lightboxIndex > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLightboxIndex((prev) => prev - 1);
+                      }}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors cursor-pointer"
+                    >
+                      <ChevronLeft size={24} />
+                    </button>
+                  )}
+                  {lightboxIndex < post.media.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLightboxIndex((prev) => prev + 1);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-colors cursor-pointer"
+                    >
+                      <ChevronRight size={24} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Bottom thumbnail strip for multi-image posts */}
+            {post.media && post.media.length > 1 && (
+              <div className="w-full flex items-center justify-center gap-2 py-3 overflow-x-auto no-scrollbar">
+                {post.media.map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setLightboxIndex(idx)}
+                    className={`relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all cursor-pointer ${
+                      idx === lightboxIndex ? 'border-white scale-105 shadow-md' : 'border-transparent opacity-50 hover:opacity-80'
+                    }`}
+                  >
+                    <img src={item.url} alt={`Thumb ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Report Post Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-scaleUp">
+            {/* Modal Header */}
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Flag size={16} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 leading-tight">
+                    Laporkan Postingan
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Bantu menjaga kenyamanan komunitas alumni
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReportModal(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleReportSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-2">
+                  Pilih Alasan Laporan:
+                </label>
+                <div className="space-y-1.5">
+                  {[
+                    { id: 'spam', label: 'Spam atau Promosi Mengganggu' },
+                    { id: 'fraud', label: 'Penipuan / Akun Palsu' },
+                    { id: 'harassment', label: 'Pelecehan / Ujaran Kebencian' },
+                    { id: 'sensitive_content', label: 'Konten Sensitif / Tidak Pantas' },
+                    { id: 'other', label: 'Alasan Lainnya' },
+                  ].map((cat) => (
+                    <label
+                      key={cat.id}
+                      className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                        reportCategory === cat.id
+                          ? 'border-brand-primary bg-blue-50/60 font-semibold text-brand-primary'
+                          : 'border-slate-200/80 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="reportCategory"
+                        value={cat.id}
+                        checked={reportCategory === cat.id}
+                        onChange={() => setReportCategory(cat.id as any)}
+                        className="text-brand-primary focus:ring-brand-primary"
+                      />
+                      <span>{cat.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Keterangan Tambahan (Opsional):
+                </label>
+                <textarea
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
+                  placeholder="Tuliskan detail laporan jika diperlukan..."
+                  rows={3}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-primary focus:bg-white transition-colors resize-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReport}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  {isSubmittingReport ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Mengirim...</span>
+                    </>
+                  ) : (
+                    <span>Kirim Laporan</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

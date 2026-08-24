@@ -20,6 +20,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { compressImage, processPostImageFiles } from '@/utils/imageCompressor';
 
 function CreatePostContent() {
   const router = useRouter();
@@ -34,6 +35,7 @@ function CreatePostContent() {
   
   // Media attachments
   const [mediaList, setMediaList] = useState<{ type: 'image' | 'video'; url: string }[]>([]);
+  const [isProcessingMedia, setIsProcessingMedia] = useState<boolean>(false);
   
   // Nostalgia metadata
   const [isThenAndNow, setIsThenAndNow] = useState<boolean>(postType === 'memory');
@@ -43,43 +45,45 @@ function CreatePostContent() {
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      if (file.size > 15 * 1024 * 1024) {
-        toast.error(`Ukuran file ${file.name} melebihi 15MB`);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setMediaList((prev) => [
-          ...prev,
-          {
-            type: file.type.startsWith('video') ? 'video' : 'image',
-            url: reader.result as string,
-          },
-        ]);
-      };
-      reader.readAsDataURL(file);
-    });
+    setIsProcessingMedia(true);
+    try {
+      const fileArray = Array.from(files);
+      const processed = await processPostImageFiles(fileArray, mediaList.length);
+      setMediaList((prev) => [...prev, ...processed]);
+      toast.success(`${processed.length} media berhasil ditambahkan.`);
+    } catch (err: any) {
+      toast.error('Gagal memproses gambar: ' + (err.message || 'Terjadi kesalahan'));
+    } finally {
+      setIsProcessingMedia(false);
+      // Reset input value to allow re-selection
+      e.target.value = '';
+    }
   };
 
-  const handleThenPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleThenPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setThenPhotoUrl(reader.result as string);
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file, { imageCount: 2 });
+      setThenPhotoUrl(compressed);
+    } catch (err: any) {
+      toast.error('Gagal memproses foto: ' + err.message);
+    }
   };
 
-  const handleNowPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNowPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setNowPhotoUrl(reader.result as string);
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file, { imageCount: 2 });
+      setNowPhotoUrl(compressed);
+    } catch (err: any) {
+      toast.error('Gagal memproses foto: ' + err.message);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -259,13 +263,14 @@ function CreatePostContent() {
 
         {/* Bottom Bar: Attachments & Submit */}
         <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-          <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 cursor-pointer transition-colors">
+          <label className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 cursor-pointer transition-colors ${isProcessingMedia ? 'opacity-60 pointer-events-none' : ''}`}>
             <ImageIcon size={16} className="text-emerald-600" />
-            <span>Lampirkan Foto / Video</span>
+            <span>{isProcessingMedia ? 'Mengompres...' : 'Lampirkan Foto / Video'}</span>
             <input
               type="file"
               accept="image/*,video/*"
               multiple
+              disabled={isProcessingMedia}
               onChange={handleMediaUpload}
               className="hidden"
             />
@@ -275,7 +280,8 @@ function CreatePostContent() {
             onClick={handleSubmit}
             variant="primary"
             size="md"
-            isLoading={isSubmitting}
+            isLoading={isSubmitting || isProcessingMedia}
+            disabled={isProcessingMedia}
           >
             Bagikan Postingan
           </AppButton>

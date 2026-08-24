@@ -188,8 +188,29 @@ export async function apiRequest<T = any>(
   throw lastNetworkError || new Error('Gagal terhubung ke server (Koneksi jaringan bermasalah).');
 }
 
+// In-flight GET request deduplication to prevent double-fetching on React 18 strict mode and parallel components
+const inFlightGetRequests = new Map<string, Promise<any>>();
+
 export const apiClient = {
-  get: <T = any>(endpoint: string) => apiRequest<T>(endpoint, { method: 'GET' }),
+  get: <T = any>(endpoint: string): Promise<T> => {
+    const token = getAccessToken() || 'anonymous';
+    const cacheKey = `${token}:${endpoint}`;
+
+    const existingPromise = inFlightGetRequests.get(cacheKey);
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const promise = apiRequest<T>(endpoint, { method: 'GET' }).finally(() => {
+      // Free up the slot after a brief debounce
+      setTimeout(() => {
+        inFlightGetRequests.delete(cacheKey);
+      }, 300);
+    });
+
+    inFlightGetRequests.set(cacheKey, promise);
+    return promise;
+  },
   post: <T = any>(endpoint: string, body?: any) => apiRequest<T>(endpoint, { method: 'POST', body }),
   put: <T = any>(endpoint: string, body?: any) => apiRequest<T>(endpoint, { method: 'PUT', body }),
   delete: <T = any>(endpoint: string) => apiRequest<T>(endpoint, { method: 'DELETE' }),

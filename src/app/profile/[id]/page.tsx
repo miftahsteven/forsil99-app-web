@@ -11,6 +11,7 @@ import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge, GoldBadge } from '@/components/ui/VerifiedBadge';
 import { PostCard } from '@/components/feed/PostCard';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { FollowListModal } from '@/components/profile/FollowListModal';
 import {
   MapPin,
   Briefcase,
@@ -44,6 +45,8 @@ export default function ProfileDetailPage() {
   const [followingCount, setFollowingCount] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'posts' | 'about'>('posts');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isFollowModalOpen, setIsFollowModalOpen] = useState<boolean>(false);
+  const [followModalTab, setFollowModalTab] = useState<'followers' | 'following'>('followers');
 
   const isMe = user?.id === targetId || myProfile?.uid === targetId;
 
@@ -58,15 +61,18 @@ export default function ProfileDetailPage() {
     try {
       const [prof, posts, followStatus] = await Promise.all([
         fetchProfileById(targetId),
-        fetchPosts(),
+        fetchPosts(undefined, targetId),
         fetchFollowStatus(targetId),
       ]);
 
-      if (prof) setProfile(prof);
-      // Filter social posts by this author (exclude shop_share products)
-      const filtered = posts.filter(
-        (p) => (p.authorId || p.author?.id) === targetId && p.type !== 'shop_share'
-      );
+      if (prof) {
+        setProfile(prof);
+        if (typeof prof.isFollowing === 'boolean') {
+          setIsFollowing(prof.isFollowing);
+        }
+      }
+      // Filter out shop_share posts if any
+      const filtered = posts.filter((p) => p.type !== 'shop_share');
       setUserPosts(filtered);
 
       if (followStatus) {
@@ -86,12 +92,25 @@ export default function ProfileDetailPage() {
       toast.error('Silakan masuk terlebih dahulu.');
       return;
     }
+
+    if (isFollowing && profile?.fullName) {
+      const confirmed = window.confirm(
+        `Apakah Anda yakin ingin berhenti mengikuti ${profile.fullName}?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
       const res: any = await toggleFollow(targetId);
       if (res) {
         setIsFollowing(res.isFollowing);
         setFollowersCount(res.followersCount);
         setFollowingCount(res.followingCount);
+        toast.success(
+          res.isFollowing
+            ? `Mulai mengikuti ${profile?.fullName || 'alumni'}`
+            : `Berhenti mengikuti ${profile?.fullName || 'alumni'}`
+        );
       }
     } catch {
       toast.error('Gagal memperbarui status follow.');
@@ -254,14 +273,38 @@ export default function ProfileDetailPage() {
 
         {/* Followers / Following Stats */}
         <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center gap-6 text-xs">
-          <div>
-            <span className="font-extrabold text-slate-900">{followersCount}</span>{' '}
-            <span className="text-slate-500">Pengikut</span>
-          </div>
-          <div>
-            <span className="font-extrabold text-slate-900">{followingCount}</span>{' '}
-            <span className="text-slate-500">Mengikuti</span>
-          </div>
+          <button
+            onClick={() => {
+              setFollowModalTab('followers');
+              setIsFollowModalOpen(true);
+            }}
+            className="text-left group cursor-pointer hover:opacity-80 transition-opacity"
+            title="Lihat daftar pengikut"
+          >
+            <span className="font-extrabold text-slate-900 group-hover:text-brand-primary transition-colors">
+              {followersCount}
+            </span>{' '}
+            <span className="text-slate-500 group-hover:text-slate-700 underline decoration-slate-300 underline-offset-2">
+              Pengikut
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setFollowModalTab('following');
+              setIsFollowModalOpen(true);
+            }}
+            className="text-left group cursor-pointer hover:opacity-80 transition-opacity"
+            title="Lihat alumni yang diikuti"
+          >
+            <span className="font-extrabold text-slate-900 group-hover:text-brand-primary transition-colors">
+              {followingCount}
+            </span>{' '}
+            <span className="text-slate-500 group-hover:text-slate-700 underline decoration-slate-300 underline-offset-2">
+              Mengikuti
+            </span>
+          </button>
+
           <div>
             <span className="font-extrabold text-slate-900">{userPosts.length}</span>{' '}
             <span className="text-slate-500">Postingan</span>
@@ -363,6 +406,23 @@ export default function ProfileDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Followers & Following Detail Modal */}
+      <FollowListModal
+        isOpen={isFollowModalOpen}
+        onClose={() => setIsFollowModalOpen(false)}
+        targetUserId={targetId}
+        targetUserName={profile.fullName}
+        initialTab={followModalTab}
+        onCountChange={async () => {
+          const status = await fetchFollowStatus(targetId);
+          if (status) {
+            setIsFollowing(status.isFollowing);
+            setFollowersCount(status.followersCount);
+            setFollowingCount(status.followingCount);
+          }
+        }}
+      />
     </div>
   );
 }
