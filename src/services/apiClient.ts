@@ -75,22 +75,30 @@ export function setCachedUserData(user: any): void {
 export function getCandidateBaseUrls(): string[] {
   const candidates: string[] = [];
 
-  // 1. Same-origin relative path (most reliable for production HTTPS web)
-  if (typeof window !== 'undefined' && window.location.origin) {
-    candidates.push(`${window.location.origin}/api/v1`);
-  }
+  const isLocalhost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === '0.0.0.0');
 
-  candidates.push('/api/v1');
-
-  // 2. Explicit configured env url
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    candidates.push(process.env.NEXT_PUBLIC_API_BASE_URL);
-  }
-
-  // 3. Local development fallback
-  if (process.env.NODE_ENV === 'development') {
+  if (isLocalhost) {
+    // On localhost, Express backend runs on port 5001
     candidates.push('http://localhost:5001/api/v1');
     candidates.push('http://127.0.0.1:5001/api/v1');
+    candidates.push('/api/v1');
+    if (typeof window !== 'undefined' && window.location.origin) {
+      candidates.push(`${window.location.origin}/api/v1`);
+    }
+  } else {
+    // Production environment
+    if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+      candidates.push(process.env.NEXT_PUBLIC_API_BASE_URL);
+    }
+    if (typeof window !== 'undefined' && window.location.origin) {
+      candidates.push(`${window.location.origin}/api/v1`);
+    }
+    candidates.push('/api/v1');
+    candidates.push('https://forsil99.mscode.id/api/v1');
   }
 
   return Array.from(new Set(candidates.filter(Boolean)));
@@ -135,7 +143,8 @@ export async function apiRequest<T = any>(
   const candidateUrls = getCandidateBaseUrls();
   let lastNetworkError: any = null;
 
-  for (const baseUrl of candidateUrls) {
+  for (let i = 0; i < candidateUrls.length; i++) {
+    const baseUrl = candidateUrls[i];
     const url = `${baseUrl}${cleanEndpoint}`;
     let response: Response;
 
@@ -155,7 +164,12 @@ export async function apiRequest<T = any>(
       continue; // Network failed on this URL, try next candidate
     }
 
-    // Server responded (status 200..599). Parse response:
+    // If 404 and not the last candidate (e.g. Next.js dev server on 3000 returned 404 for /api/v1), try next
+    if (response.status === 404 && i < candidateUrls.length - 1) {
+      continue;
+    }
+
+    // Server responded. Parse response:
     let data: any;
     try {
       data = await response.json();
@@ -164,7 +178,6 @@ export async function apiRequest<T = any>(
     }
 
     if (!response.ok) {
-      // Throw the server's actual error message directly (e.g. "Nomor HP sudah terdaftar", "Foto selfie wajib diunggah", etc.)
       throw new Error(data.message || `Terjadi kesalahan pada server (${response.status})`);
     }
 
