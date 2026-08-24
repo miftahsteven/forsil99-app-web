@@ -1,21 +1,24 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
+import { AppRecaptcha } from '@/components/ui/AppRecaptcha';
 import { Lock, Smartphone, Eye, EyeOff, Sparkles, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
+  const recaptchaRef = useRef<any>(null);
 
   const [identifier, setIdentifier] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,16 +31,22 @@ export default function LoginPage() {
       toast.error('Kata sandi wajib diisi.');
       return;
     }
+    if (!recaptchaToken) {
+      toast.error('Harap selesaikan verifikasi reCAPTCHA ("Saya bukan robot").');
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const res = await login(identifier, password);
+      const res = await login(identifier, password, recaptchaToken);
       if (res.success) {
         toast.success(`Selamat datang kembali, ${res.profile?.fullName || 'Alumni'}!`);
         router.push('/');
       }
     } catch (err: any) {
       toast.error(err.message || 'Nomor HP/Email atau kata sandi tidak cocok.');
+      recaptchaRef.current?.reset();
+      setRecaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +104,13 @@ export default function LoginPage() {
             }
             autoComplete="current-password"
             required
+          />
+
+          {/* Google reCAPTCHA v2 Checkbox */}
+          <AppRecaptcha
+            ref={recaptchaRef}
+            onChange={(token) => setRecaptchaToken(token)}
+            onExpired={() => setRecaptchaToken(null)}
           />
 
           <AppButton

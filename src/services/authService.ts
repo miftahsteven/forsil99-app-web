@@ -25,11 +25,12 @@ export function normalizeProfile(profile: any): AlumniProfile | null {
 /**
  * Login with Phone/Email and Password
  */
-export async function loginWithEmailOrPhone(identifier: string, pass: string) {
+export async function loginWithEmailOrPhone(identifier: string, pass: string, recaptchaToken?: string) {
   const platform = getPlatformIdentifier();
   const res = await apiClient.post('/auth/login', {
     identifier: identifier.trim(),
     password: pass,
+    recaptchaToken,
     platform,
   });
 
@@ -63,6 +64,7 @@ export async function registerAlumniUser(payload: {
   referralAccountId?: string;
   referralName?: string;
   selfieBase64?: string;
+  recaptchaToken?: string;
 }) {
   const platform = getPlatformIdentifier();
   const res = await apiClient.post('/auth/register', {
@@ -76,6 +78,7 @@ export async function registerAlumniUser(payload: {
     referralAccountId: payload.referralAccountId,
     referralName: payload.referralName,
     selfieBase64: payload.selfieBase64,
+    recaptchaToken: payload.recaptchaToken,
     platform,
   });
 

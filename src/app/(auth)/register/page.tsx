@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
+import { AppRecaptcha } from '@/components/ui/AppRecaptcha';
 import { fetchAlumniList, registerAlumniUser } from '@/services/authService';
 import {
   User,
@@ -55,7 +56,9 @@ export default function RegisterPage() {
   const [hasSearched, setHasSearched] = useState<boolean>(false);
 
   const [selfieBase64, setSelfieBase64] = useState<string>('');
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const recaptchaRef = useRef<any>(null);
 
   // Search referral when query length >= 3
   useEffect(() => {
@@ -185,6 +188,10 @@ export default function RegisterPage() {
       toast.error('Foto selfie verifikasi wajah wajib diunggah.');
       return;
     }
+    if (!recaptchaToken) {
+      toast.error('Harap selesaikan verifikasi reCAPTCHA ("Saya bukan robot").');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -200,12 +207,15 @@ export default function RegisterPage() {
         referralAccountId: referralId,
         referralName: referralName || 'Rekan Alumni',
         selfieBase64,
+        recaptchaToken,
       });
 
       toast.success('Pendaftaran alumni terkirim! Menunggu konfirmasi referral via email.');
       router.push('/awaiting-approval');
     } catch (err: any) {
       toast.error(err.message || 'Pendaftaran gagal. Silakan periksa data Anda.');
+      recaptchaRef.current?.reset();
+      setRecaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -464,12 +474,19 @@ export default function RegisterPage() {
             </p>
           </div>
 
+          {/* Google reCAPTCHA v2 Checkbox */}
+          <AppRecaptcha
+            ref={recaptchaRef}
+            onChange={(token) => setRecaptchaToken(token)}
+            onExpired={() => setRecaptchaToken(null)}
+          />
+
           <AppButton
             type="submit"
             variant="gold"
             size="lg"
             isLoading={isLoading}
-            className="w-full mt-4"
+            className="w-full mt-2"
           >
             Kirim Pendaftaran Alumni
           </AppButton>

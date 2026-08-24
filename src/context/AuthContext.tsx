@@ -21,7 +21,7 @@ interface AuthContextType {
   profile: AlumniProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (identifier: string, pass: string) => Promise<any>;
+  login: (identifier: string, pass: string, recaptchaToken?: string) => Promise<any>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
   updateCurrentProfileState: (updated: Partial<AlumniProfile>) => void;
@@ -74,8 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
   }, [initAuth]);
 
-  const login = async (identifier: string, pass: string) => {
-    const res = await loginWithEmailOrPhone(identifier, pass);
+  const login = async (identifier: string, pass: string, recaptchaToken?: string) => {
+    const res = await loginWithEmailOrPhone(identifier, pass, recaptchaToken);
     if (res.user) {
       setUser(res.user);
     }
