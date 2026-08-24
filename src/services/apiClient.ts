@@ -118,6 +118,7 @@ export async function apiRequest<T = any>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-platform': platform,
+    'x-client-timestamp': Date.now().toString(),
     ...(options.headers || {}),
   };
 
