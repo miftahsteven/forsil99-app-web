@@ -1,25 +1,28 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
-import { AppRecaptcha } from '@/components/ui/AppRecaptcha';
-import { Lock, Smartphone, Eye, EyeOff, Sparkles, CheckCircle2 } from 'lucide-react';
+import { executeRecaptchaV3, loadRecaptchaV3Script } from '@/utils/recaptcha';
+import { Lock, Smartphone, Eye, EyeOff, Sparkles, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const recaptchaRef = useRef<any>(null);
 
   const [identifier, setIdentifier] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Preload reCAPTCHA v3 script
+  useEffect(() => {
+    loadRecaptchaV3Script();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,22 +34,19 @@ export default function LoginPage() {
       toast.error('Kata sandi wajib diisi.');
       return;
     }
-    if (!recaptchaToken) {
-      toast.error('Harap selesaikan verifikasi reCAPTCHA ("Saya bukan robot").');
-      return;
-    }
 
     setIsLoading(true);
     try {
-      const res = await login(identifier, password, recaptchaToken);
+      // Execute reCAPTCHA v3 in background
+      const recaptchaToken = await executeRecaptchaV3('login');
+
+      const res = await login(identifier, password, recaptchaToken || undefined);
       if (res.success) {
         toast.success(`Selamat datang kembali, ${res.profile?.fullName || 'Alumni'}!`);
         router.push('/');
       }
     } catch (err: any) {
       toast.error(err.message || 'Nomor HP/Email atau kata sandi tidak cocok.');
-      recaptchaRef.current?.reset();
-      setRecaptchaToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -106,12 +106,10 @@ export default function LoginPage() {
             required
           />
 
-          {/* Google reCAPTCHA v2 Checkbox */}
-          <AppRecaptcha
-            ref={recaptchaRef}
-            onChange={(token) => setRecaptchaToken(token)}
-            onExpired={() => setRecaptchaToken(null)}
-          />
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 py-1">
+            <ShieldCheck size={14} className="text-brand-primary" />
+            <span>Dilindungi oleh Google reCAPTCHA v3</span>
+          </div>
 
           <AppButton
             type="submit"
