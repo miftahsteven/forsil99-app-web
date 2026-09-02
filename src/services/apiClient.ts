@@ -98,7 +98,7 @@ export function getCandidateBaseUrls(): string[] {
       candidates.push(`${window.location.origin}/api/v1`);
     }
     candidates.push('/api/v1');
-    candidates.push('https://forsil99.mscode.id/api/v1');
+    candidates.push('https://forsil99.us/api/v1');
   }
 
   return Array.from(new Set(candidates.filter(Boolean)));

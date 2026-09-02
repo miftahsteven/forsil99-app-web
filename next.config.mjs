@@ -15,10 +15,11 @@ const nextConfig = {
     ],
   },
   async rewrites() {
+    const backendPort = process.env.BACKEND_PORT || (process.env.NODE_ENV === 'production' ? '7038' : '5001');
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:5001/api/:path*',
+        destination: `http://127.0.0.1:${backendPort}/api/:path*`,
       },
     ];
   },
