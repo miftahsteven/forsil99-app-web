@@ -9,7 +9,7 @@ import {
   getCachedUserData,
   getPlatformIdentifier,
 } from './apiClient';
-import { UserAccount, AlumniProfile } from '@/types';
+import { UserAccount, AlumniProfile, AlumniRegistration } from '@/types';
 
 export function normalizeProfile(profile: any): AlumniProfile | null {
   if (!profile) return null;
@@ -26,13 +26,20 @@ export function normalizeProfile(profile: any): AlumniProfile | null {
 /**
  * Login with Phone/Email and Password
  */
-export async function loginWithEmailOrPhone(identifier: string, pass: string, recaptchaToken?: string) {
+export async function loginWithEmailOrPhone(
+  identifier: string,
+  pass: string,
+  recaptchaToken?: string,
+  coords?: { latitude?: number; longitude?: number }
+) {
   const platform = getPlatformIdentifier();
   const res = await apiClient.post('/auth/login', {
     identifier: identifier.trim(),
     password: pass,
     recaptchaToken,
     platform,
+    latitude: coords?.latitude,
+    longitude: coords?.longitude,
   });
 
   if (res.token) {
@@ -173,11 +180,11 @@ export async function checkRegistrationStatus(googleUid: string) {
 }
 
 /**
- * Fetch pending registrations awaiting this user's referral approval
+ * Fetch registrations awaiting this user's referral approval or history
  */
-export async function fetchPendingReferrals(accountId: string) {
+export async function fetchPendingReferrals(accountId: string, status: string = 'submitted'): Promise<AlumniRegistration[]> {
   try {
-    const res = await apiClient.get(`/alumni-registration/pending-for-referrer/${accountId}`);
+    const res = await apiClient.get(`/alumni-registration/pending-for-referrer/${accountId}?status=${status}`);
     return res.registrations || [];
   } catch {
     return [];
@@ -282,9 +289,17 @@ export async function updateProfile(payload: {
   nickname?: string;
   bio?: string;
   className?: string;
+  gender?: string;
+  maritalStatus?: string;
+  birthDate?: string;
+  whatsappNumber?: string;
+  city?: string;
+  currentAddress?: string;
   occupation?: string;
   company?: string;
-  city?: string;
+  hobbies?: string[];
+  profileVisibility?: 'public' | 'followers' | 'private';
+  tempPublicHours?: number;
   profilePhotoUrl?: string;
   coverPhotoUrl?: string;
 }): Promise<AlumniProfile | null> {
@@ -298,8 +313,98 @@ export async function updateProfile(payload: {
 }
 
 /**
+ * Quick toggle profile visibility or temporary public window
+ */
+export async function toggleProfileVisibility(visibility: 'public' | 'followers' | 'private', tempHours?: number): Promise<AlumniProfile | null> {
+  const res = await apiClient.post('/profiles/me/toggle-visibility', { visibility, tempHours });
+  if (res && res.profile) {
+    const norm = normalizeProfile(res.profile);
+    setCachedUserProfile(norm);
+    return norm;
+  }
+  return null;
+}
+
+/**
  * Logout
  */
 export function logoutUser(): void {
   clearAccessToken();
+}
+
+/**
+ * Request OTP verification code for new alumni registration
+ */
+export async function sendRegistrationOtp(email: string, fullName: string, recaptchaToken?: string) {
+  const platform = getPlatformIdentifier();
+  return await apiClient.post('/auth/send-registration-otp', {
+    email: email.trim(),
+    fullName: fullName.trim(),
+    recaptchaToken,
+    platform,
+  });
+}
+
+/**
+ * Verify OTP and submit registration atomically
+ */
+export async function verifyRegistrationOtpAndRegister(payload: {
+  otpCode: string;
+  fullName: string;
+  nickname?: string;
+  className: string;
+  phone?: string;
+  email: string;
+  password: string;
+  graduationYear?: number;
+  referralAccountId?: string;
+  referralName?: string;
+  selfieBase64?: string;
+  recaptchaToken?: string;
+}) {
+  const platform = getPlatformIdentifier();
+  const res = await apiClient.post('/auth/verify-registration-otp', {
+    otpCode: payload.otpCode.trim(),
+    fullName: payload.fullName.trim(),
+    nickname: payload.nickname?.trim() || undefined,
+    className: payload.className,
+    phoneNumber: payload.phone?.trim() || undefined,
+    email: payload.email.trim(),
+    password: payload.password,
+    graduationYear: payload.graduationYear || 1999,
+    referralAccountId: payload.referralAccountId,
+    referralName: payload.referralName,
+    selfieBase64: payload.selfieBase64,
+    recaptchaToken: payload.recaptchaToken,
+    platform,
+  });
+
+  if (res.token && res.user?.verificationStatus === 'approved') {
+    setAccessToken(res.token);
+  }
+  if (res.user) {
+    setCachedUserData(res.user);
+  }
+  if (res.profile) {
+    const norm = normalizeProfile(res.profile);
+    setCachedUserProfile(norm);
+    res.profile = norm;
+  }
+  return res;
+}
+
+/**
+ * Change password (authenticated or with security reset token)
+ */
+export async function changePassword(payload: {
+  oldPassword?: string;
+  newPassword: string;
+  confirmPassword: string;
+  securityToken?: string;
+}) {
+  const res = await apiClient.post('/auth/change-password', payload);
+  if (res.token) {
+    setAccessToken(res.token);
+  }
+  return res;
 }

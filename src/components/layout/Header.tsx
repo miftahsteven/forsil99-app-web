@@ -4,13 +4,15 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Bell, Calendar, ShieldCheck, User } from 'lucide-react';
+import { MessageSquare, Bell, Calendar, ShieldCheck, User, UserCheck, Shield } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useNotification } from '@/context/NotificationContext';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 
 export function Header() {
   const pathname = usePathname();
   const { user, profile, isAuthenticated, isAdmin } = useAuth();
+  const { unreadCount, pendingReferrals } = useNotification();
 
   // Hide header on login / register pages
   if (pathname === '/login' || pathname === '/register' || pathname === '/awaiting-approval') {
@@ -67,24 +69,61 @@ export function Header() {
                 className={`relative p-2 rounded-full text-slate-600 hover:text-brand-primary hover:bg-slate-100 transition-colors ${
                   pathname === '/notifications' ? 'text-brand-primary bg-blue-50' : ''
                 }`}
-                title="Notifikasi"
+                title={unreadCount > 0 ? `${unreadCount} Notifikasi Belum Dibaca` : 'Notifikasi'}
+                aria-label={unreadCount > 0 ? `${unreadCount} notifikasi belum dibaca` : 'Notifikasi'}
               >
                 <Bell size={19} />
+
+                {unreadCount > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white shadow-xs animate-scale-in"
+                  >
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </Link>
 
-              {/* Admin Portal (if role allows) */}
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  prefetch={false}
-                  className={`p-2 rounded-full text-amber-700 hover:bg-amber-50 transition-colors ${
-                    pathname === '/admin' ? 'bg-amber-100' : ''
-                  }`}
-                  title="Admin Moderasi & Verifikasi"
-                >
-                  <ShieldCheck size={19} />
-                </Link>
-              )}
+              {/* Verification & Admin Portal (Accessible to all alumni) */}
+              <Link
+                href="/admin"
+                prefetch={false}
+                className={`relative p-2 rounded-full transition-colors ${
+                  pathname === '/admin'
+                    ? 'text-brand-primary bg-blue-50'
+                    : 'text-slate-600 hover:text-brand-primary hover:bg-slate-100'
+                }`}
+                title={isAdmin ? 'Portal Pengurus & Admin' : 'Portal Verifikasi Referral Rekan'}
+                aria-label={isAdmin ? 'Portal Pengurus & Admin' : 'Portal Verifikasi Referral Rekan'}
+              >
+                {isAdmin ? (
+                  <ShieldCheck size={19} className="text-amber-700" />
+                ) : (
+                  <UserCheck size={19} />
+                )}
+
+                {pendingReferrals.length > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 bg-amber-500 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center border-2 border-white shadow-xs animate-scale-in"
+                  >
+                    {pendingReferrals.length > 99 ? '99+' : pendingReferrals.length}
+                  </span>
+                )}
+              </Link>
+
+              {/* Kebijakan Privasi & Kepatuhan UU PDP */}
+              <Link
+                href="/privacy"
+                prefetch={false}
+                className={`p-2 rounded-full transition-colors ${
+                  pathname === '/privacy'
+                    ? 'text-emerald-700 bg-emerald-50'
+                    : 'text-slate-600 hover:text-emerald-700 hover:bg-emerald-50/70'
+                }`}
+                title="Kebijakan Privasi & Kepatuhan UU PDP Forsil 99"
+                aria-label="Kebijakan Privasi & Kepatuhan UU PDP Forsil 99"
+              >
+                <Shield size={19} className={pathname === '/privacy' ? 'text-emerald-700' : 'text-emerald-600'} />
+              </Link>
 
               {/* Profile Avatar */}
               <Link
@@ -101,12 +140,22 @@ export function Header() {
               </Link>
             </>
           ) : (
-            <Link
-              href="/login"
-              className="px-3 py-1.5 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primaryDark shadow-sm"
-            >
-              Masuk
-            </Link>
+            <div className="flex items-center gap-1.5">
+              <Link
+                href="/privacy"
+                prefetch={false}
+                className="p-2 rounded-full text-slate-600 hover:text-emerald-700 hover:bg-emerald-50/70 transition-colors"
+                title="Kebijakan Privasi & Kepatuhan UU PDP Forsil 99"
+              >
+                <Shield size={19} className="text-emerald-600" />
+              </Link>
+              <Link
+                href="/login"
+                className="px-3 py-1.5 rounded-lg bg-brand-primary text-white text-xs font-semibold hover:bg-brand-primaryDark shadow-sm"
+              >
+                Masuk
+              </Link>
+            </div>
           )}
         </div>
       </div>

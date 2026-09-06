@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { toggleFollow } from '@/services/authService';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { ProfileCategoryBadge } from '@/components/ui/ProfileCategoryBadge';
 import { toast } from 'sonner';
 
 interface AlumniCardProps {
@@ -80,7 +81,11 @@ export function AlumniCard({ alumni, isFollowingInitial = false }: AlumniCardPro
             <h4 className="font-bold text-sm text-slate-900 group-hover:text-brand-primary transition-colors truncate">
               {alumni.fullName}
             </h4>
-            <VerifiedBadge size={14} />
+            {alumni.profileCategory ? (
+              <ProfileCategoryBadge category={alumni.profileCategory} size={15} />
+            ) : (
+              <VerifiedBadge size={14} />
+            )}
           </div>
 
           <div className="flex items-center gap-2 mt-0.5">

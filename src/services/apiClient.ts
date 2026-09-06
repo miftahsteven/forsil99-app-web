@@ -179,7 +179,12 @@ export async function apiRequest<T = any>(
     }
 
     if (!response.ok) {
-      throw new Error(data.message || `Terjadi kesalahan pada server (${response.status})`);
+      const error: any = new Error(data.message || `Terjadi kesalahan pada server (${response.status})`);
+      error.data = data;
+      error.status = response.status;
+      error.isLocked = data.isLocked;
+      error.retryAfterSeconds = data.retryAfterSeconds;
+      throw error;
     }
 
     return data;

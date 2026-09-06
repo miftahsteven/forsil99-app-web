@@ -2,11 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { ProductCard } from '@/components/shop/ProductCard';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { fetchProducts } from '@/services/shopService';
-import { Product } from '@/types';
-import { Search, ShoppingBag, Plus, Tag, Store } from 'lucide-react';
+import { SellerRegistrationModal } from '@/components/shop/SellerRegistrationModal';
+import { fetchProducts, fetchMyShop } from '@/services/shopService';
+import { Product, Shop } from '@/types';
+import { Search, ShoppingBag, Plus, Tag, Store, Sparkles, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CATEGORIES = [
@@ -20,14 +23,26 @@ const CATEGORIES = [
 ];
 
 export default function ShopDirectoryPage() {
+  const router = useRouter();
+  const { user, profile, isAuthenticated } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [myShop, setMyShop] = useState<Shop | null>(null);
+  const [isSellerModalOpen, setIsSellerModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     loadProducts();
   }, [activeCategory, searchQuery]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchMyShop().then((shop) => {
+        if (shop) setMyShop(shop);
+      });
+    }
+  }, [isAuthenticated]);
 
   const loadProducts = async () => {
     setIsLoading(true);
@@ -41,18 +56,39 @@ export default function ShopDirectoryPage() {
     }
   };
 
+  const handleOpenSellerModal = () => {
+    if (!isAuthenticated) {
+      toast.error('Silakan masuk terlebih dahulu untuk bergabung menjadi Seller 99.');
+      router.push('/login');
+      return;
+    }
+    setIsSellerModalOpen(true);
+  };
+
   return (
     <div className="w-full px-3 py-3">
       {/* Banner */}
       <div className="bg-gradient-to-r from-amber-700 via-amber-800 to-amber-900 rounded-2xl p-4 text-white mb-3.5 shadow-card relative overflow-hidden">
-        <div className="relative z-10">
-          <div className="flex items-center gap-1.5">
-            <ShoppingBag size={18} className="text-amber-300" />
-            <h1 className="text-lg font-bold">Pasar Alumni — Seller 99</h1>
+        <div className="relative z-10 flex items-start justify-between flex-wrap gap-3">
+          <div className="max-w-md">
+            <div className="flex items-center gap-1.5">
+              <ShoppingBag size={18} className="text-amber-300" />
+              <h1 className="text-lg font-bold">Pasar Alumni — Seller 99</h1>
+            </div>
+            <p className="text-xs text-amber-100 mt-1 leading-relaxed">
+              Dukung dan gunakan produk, kuliner, dan jasa dari sesama alumni SMAN 59 Jakarta.
+            </p>
           </div>
-          <p className="text-xs text-amber-100 mt-1 max-w-sm">
-            Dukung dan gunakan produk, kuliner, dan jasa dari sesama alumni SMAN 59.
-          </p>
+
+          <button
+            onClick={handleOpenSellerModal}
+            className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5 flex-shrink-0"
+          >
+            <Store size={15} />
+            <span>
+              {myShop ? 'Kelola / Edit Lapak 99' : 'Gabung jadi seller 99'}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -114,6 +150,17 @@ export default function ShopDirectoryPage() {
           ))}
         </div>
       )}
+
+      {/* Seller Registration Modal */}
+      <SellerRegistrationModal
+        isOpen={isSellerModalOpen}
+        onClose={() => setIsSellerModalOpen(false)}
+        initialShop={myShop}
+        onSuccess={(newShop) => {
+          setMyShop(newShop);
+          loadProducts();
+        }}
+      />
     </div>
   );
 }

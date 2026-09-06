@@ -2,16 +2,21 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { fetchProfileById, toggleFollow, fetchFollowStatus } from '@/services/authService';
 import { fetchPosts } from '@/services/postService';
-import { AlumniProfile, Post } from '@/types';
+import { fetchProducts, fetchShops } from '@/services/shopService';
+import { AlumniProfile, Post, Product, Shop } from '@/types';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge, GoldBadge } from '@/components/ui/VerifiedBadge';
+import { ProfileCategoryBadge } from '@/components/ui/ProfileCategoryBadge';
+import { SuperIntrovBanner } from '@/components/profile/SuperIntrovBanner';
 import { PostCard } from '@/components/feed/PostCard';
+import { ProductCard } from '@/components/shop/ProductCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FollowListModal } from '@/components/profile/FollowListModal';
+import { SellerRegistrationModal } from '@/components/shop/SellerRegistrationModal';
 import {
   MapPin,
   Briefcase,
@@ -27,8 +32,65 @@ import {
   Share2,
   Calendar,
   Grid,
+  KeyRound,
+  Phone,
+  Heart,
+  Lock,
+  Clock,
+  Sparkles,
+  Shield,
+  Cake,
+  Home,
+  User,
+  ExternalLink,
+  Database,
+  Award,
+  Info,
+  CheckCircle2,
+  Mail,
+  FileText,
+  BadgeCheck,
+  Store,
+  ShoppingBag,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+const formatBirthDate = (isoStr?: string) => {
+  if (!isoStr) return null;
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch {
+    return isoStr;
+  }
+};
+
+const calculateAge = (birthDateStr?: string) => {
+  if (!birthDateStr) return null;
+  try {
+    const birth = new Date(birthDateStr);
+    if (isNaN(birth.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age > 0 ? `(${age} thn)` : null;
+  } catch {
+    return null;
+  }
+};
+
+const getWhatsAppUrl = (phone?: string) => {
+  if (!phone) return '#';
+  let clean = phone.replace(/\D/g, '');
+  if (clean.startsWith('0')) {
+    clean = '62' + clean.slice(1);
+  }
+  return `https://wa.me/${clean}`;
+};
 
 export default function ProfileDetailPage() {
   const params = useParams();
@@ -40,15 +102,37 @@ export default function ProfileDetailPage() {
 
   const [profile, setProfile] = useState<AlumniProfile | null>(null);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [sellerPosts, setSellerPosts] = useState<Post[]>([]);
+  const [userProducts, setUserProducts] = useState<Product[]>([]);
+  const [userShop, setUserShop] = useState<Shop | null>(null);
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
   const [followersCount, setFollowersCount] = useState<number>(0);
   const [followingCount, setFollowingCount] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState<'posts' | 'about'>('posts');
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams?.get('tab');
+  const [activeTab, setActiveTab] = useState<'about' | 'posts' | 'seller'>(
+    requestedTab === 'posts' ? 'posts' : requestedTab === 'seller' ? 'seller' : 'about'
+  );
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFollowModalOpen, setIsFollowModalOpen] = useState<boolean>(false);
   const [followModalTab, setFollowModalTab] = useState<'followers' | 'following'>('followers');
+  const [isSellerModalOpen, setIsSellerModalOpen] = useState<boolean>(false);
 
-  const isMe = user?.id === targetId || myProfile?.uid === targetId;
+  const isMe =
+    Boolean(user?.id && (user.id === targetId || user.id === profile?.userId || user.id === profile?.id)) ||
+    Boolean(myProfile?.uid && (myProfile.uid === targetId || myProfile.uid === profile?.userId || myProfile.uid === profile?.id)) ||
+    Boolean(myProfile?.userId && (myProfile.userId === targetId || myProfile.userId === profile?.userId || myProfile.userId === profile?.id)) ||
+    Boolean(profile && (profile.userId === user?.id || profile.id === myProfile?.id));
+
+  useEffect(() => {
+    if (requestedTab === 'posts') {
+      setActiveTab('posts');
+    } else if (requestedTab === 'seller') {
+      setActiveTab('seller');
+    } else if (requestedTab === 'about') {
+      setActiveTab('about');
+    }
+  }, [requestedTab]);
 
   useEffect(() => {
     if (targetId) {
@@ -59,10 +143,12 @@ export default function ProfileDetailPage() {
   const loadProfileData = async () => {
     setIsLoading(true);
     try {
-      const [prof, posts, followStatus] = await Promise.all([
+      const [prof, posts, followStatus, prods, shops] = await Promise.all([
         fetchProfileById(targetId),
         fetchPosts(undefined, targetId),
         fetchFollowStatus(targetId),
+        fetchProducts(undefined, undefined, targetId),
+        fetchShops(targetId),
       ]);
 
       if (prof) {
@@ -71,9 +157,16 @@ export default function ProfileDetailPage() {
           setIsFollowing(prof.isFollowing);
         }
       }
-      // Filter out shop_share posts if any
-      const filtered = posts.filter((p) => p.type !== 'shop_share');
-      setUserPosts(filtered);
+      const regularPosts = posts.filter((p) => p.type !== 'shop_share');
+      const shopPosts = posts.filter((p) => p.type === 'shop_share');
+      setUserPosts(regularPosts);
+      setSellerPosts(shopPosts);
+      setUserProducts(prods || []);
+      if (shops && shops.length > 0) {
+        setUserShop(shops[0]);
+      } else {
+        setUserShop(null);
+      }
 
       if (followStatus) {
         setIsFollowing(followStatus.isFollowing);
@@ -181,6 +274,13 @@ export default function ProfileDetailPage() {
                   <Edit3 size={14} />
                   <span>Edit Profil</span>
                 </Link>
+                <Link
+                  href="/change-password"
+                  className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                  title="Ubah Kata Sandi Akun"
+                >
+                  <KeyRound size={16} />
+                </Link>
                 <button
                   onClick={logout}
                   className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
@@ -217,15 +317,21 @@ export default function ProfileDetailPage() {
 
       {/* 2. User Bio & Details */}
       <div className="px-4 pt-3 pb-4 bg-white border-b border-slate-100">
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <h1 className="text-lg font-bold text-slate-900 leading-tight">
             {profile.fullName}
           </h1>
-          <VerifiedBadge size={16} />
+          <ProfileCategoryBadge category={profile.profileCategory} size={18} showLabel />
+          {profile.isTempPublic && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+              <Clock size={11} />
+              Akses Terbuka Sementara
+            </span>
+          )}
         </div>
 
         {profile.nickname && (
-          <p className="text-xs text-slate-500 font-normal">
+          <p className="text-xs text-slate-500 font-normal mt-0.5">
             Panggilan: <span className="font-semibold text-slate-700">"{profile.nickname}"</span>
           </p>
         )}
@@ -235,6 +341,16 @@ export default function ProfileDetailPage() {
             <GraduationCap size={13} />
             <span>Kelas {profile.className || 'SMAN 59'} (1999)</span>
           </span>
+          {profile.gender && (
+            <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+              {profile.gender}
+            </span>
+          )}
+          {profile.maritalStatus && (
+            <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+              {profile.maritalStatus}
+            </span>
+          )}
           {profile.nia && (
             <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
               NIA: {profile.nia}
@@ -312,27 +428,48 @@ export default function ProfileDetailPage() {
         </div>
       </div>
 
-      {/* 3. Tab Bar: Postingan / Detail */}
-      <div className="flex items-center border-b border-slate-200 bg-white sticky top-14 z-20">
-        <button
-          onClick={() => setActiveTab('posts')}
-          className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-colors ${
-            activeTab === 'posts'
-              ? 'border-brand-primary text-brand-primary'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          Postingan ({userPosts.length})
-        </button>
+      {/* Super Introv Profile Completion Alert */}
+      {isMe && profile.profileCategory === 'super_introv' && (
+        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+          <SuperIntrovBanner profile={profile} />
+        </div>
+      )}
+
+      {/* 3. Tab Bar: Kanal Profil, Postingan, & Lapak Seller 99 */}
+      <div className="flex items-center border-b border-slate-200 bg-white sticky top-14 z-20 shadow-2xs">
         <button
           onClick={() => setActiveTab('about')}
-          className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-colors ${
+          className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
             activeTab === 'about'
-              ? 'border-brand-primary text-brand-primary'
+              ? 'border-brand-primary text-brand-primary bg-blue-50/20'
               : 'border-transparent text-slate-500 hover:text-slate-900'
           }`}
         >
-          Tentang Alumni
+          <Database size={14} />
+          <span className="hidden sm:inline">Kanal Profil (Database)</span>
+          <span className="sm:hidden">Database</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('posts')}
+          className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'posts'
+              ? 'border-brand-primary text-brand-primary bg-blue-50/20'
+              : 'border-transparent text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <Grid size={14} />
+          <span>Postingan ({userPosts.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('seller')}
+          className={`flex-1 py-3 text-xs font-bold text-center border-b-2 transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === 'seller'
+              ? 'border-amber-600 text-amber-600 bg-amber-50/30'
+              : 'border-transparent text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          <Store size={14} />
+          <span>Lapak Seller 99 ({userProducts.length + sellerPosts.length})</span>
         </button>
       </div>
 
@@ -352,57 +489,594 @@ export default function ProfileDetailPage() {
               ))}
             </div>
           )
-        ) : (
-          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-subtle space-y-4 text-xs text-slate-700">
-            <div>
-              <h4 className="font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Keahlian & Minat
-              </h4>
-              <div className="flex flex-wrap gap-1.5 mt-1">
-                {profile.skills && profile.skills.length > 0 ? (
-                  profile.skills.map((s, i) => (
-                    <span
-                      key={i}
-                      className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-medium"
-                    >
-                      {s}
+        ) : activeTab === 'seller' ? (
+          /* DEDICATED SELLER COLUMN */
+          <div className="space-y-4">
+            {/* 1. Shop Header Card (if user has shop) */}
+            {userShop ? (
+              <div className="bg-gradient-to-br from-amber-900 via-amber-800 to-slate-900 text-white rounded-3xl p-5 shadow-lg border border-amber-700/60 relative overflow-hidden">
+                <div className="absolute -right-6 -bottom-8 opacity-10 text-white pointer-events-none">
+                  <Store size={160} />
+                </div>
+
+                <div className="relative z-10 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-amber-400/20 border border-amber-300/30 text-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                      <Store size={12} />
+                      <span>Lapak Seller Resmi Forsil 99</span>
                     </span>
-                  ))
-                ) : (
-                  <span className="text-slate-400">Belum ditambahkan</span>
-                )}
+                    {userShop.isDonator && (
+                      <span className="px-2.5 py-1 rounded-lg bg-emerald-400/20 border border-emerald-300/30 text-emerald-300 text-[10px] font-bold flex items-center gap-1">
+                        <Heart size={11} className="fill-emerald-300" />
+                        <span>Donatur Kas Sosial Forsil 99</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-black text-white leading-tight flex items-center gap-2">
+                      <span>{userShop.name}</span>
+                    </h3>
+                    <p className="text-xs text-amber-100 mt-1 leading-relaxed">
+                      {userShop.description}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-amber-100">
+                    {userShop.address && (
+                      <div className="flex items-center gap-1.5 truncate">
+                        <MapPin size={13} className="text-amber-300 flex-shrink-0" />
+                        <span className="truncate">{userShop.address}</span>
+                      </div>
+                    )}
+                    {(userShop.contactPhone || profile.whatsappNumber) && (
+                      <div className="flex items-center gap-1.5">
+                        <Phone size={13} className="text-emerald-400 flex-shrink-0" />
+                        <span className="font-mono">{userShop.contactPhone || profile.whatsappNumber}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {userShop.isDonator && userShop.donationNote && (
+                    <div className="p-2.5 rounded-xl bg-white/10 border border-white/15 text-[11px] text-amber-100 flex items-center gap-2">
+                      <Heart size={14} className="text-rose-400 fill-rose-400 flex-shrink-0" />
+                      <span>
+                        Komitmen Donasi: <strong>{userShop.donationNote}</strong>
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex items-center justify-between flex-wrap gap-2">
+                    {(userShop.contactPhone || profile.whatsappNumber) ? (
+                      <a
+                        href={getWhatsAppUrl(userShop.contactPhone || profile.whatsappNumber)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs transition-colors inline-flex items-center gap-1.5"
+                      >
+                        <Phone size={13} />
+                        <span>Chat WhatsApp Lapak</span>
+                        <ExternalLink size={11} />
+                      </a>
+                    ) : (
+                      <span />
+                    )}
+
+                    {isMe && (
+                      <button
+                        onClick={() => setIsSellerModalOpen(true)}
+                        className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs transition-colors flex items-center gap-1.5"
+                      >
+                        <Edit3 size={13} />
+                        <span>Edit Info Toko</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 2. Invitation Banner if user is Me and does NOT have a shop yet */}
+            {!userShop && isMe && (
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-6 border border-amber-200 shadow-sm text-center space-y-3.5">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shadow-xs">
+                  <Store size={28} />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-slate-900 text-base">
+                    Buka Lapak Usaha & Jasa Anda di Seller 99
+                  </h3>
+                  <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+                    Dukung perputaran ekonomi sesama rekan alumni SMAN 59. Promosikan produk kuliner, fashion, gadget, atau jasa profesional Anda langsung ke seluruh rekan angkatan '99.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 flex-wrap text-[11px] text-slate-500 font-medium">
+                  <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-slate-700">
+                    <CheckCircle2 size={12} className="text-emerald-500" />
+                    Data Alumni Lengkap
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-slate-700">
+                    <CheckCircle2 size={12} className="text-emerald-500" />
+                    Minimal Kategori Extrov
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-slate-700">
+                    <CheckCircle2 size={12} className="text-emerald-500" />
+                    Validasi Tim Lapak 99
+                  </span>
+                </div>
+
+                <div className="pt-1">
+                  <button
+                    onClick={() => setIsSellerModalOpen(true)}
+                    className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-md transition-all inline-flex items-center gap-2 active:scale-95 shadow-amber-600/20"
+                  >
+                    <Store size={15} />
+                    <span>Gabung Jadi Seller 99</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Products Grid & Seller Posts */}
+            <div className="space-y-4">
+              {userProducts.length > 0 && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <ShoppingBag size={14} className="text-amber-600" />
+                      <span>Etalase Produk ({userProducts.length})</span>
+                    </h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {userProducts.map((prod) => (
+                      <ProductCard key={prod.id} product={prod} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {sellerPosts.length > 0 && (
+                <div className="space-y-2.5">
+                  <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-amber-600" />
+                    <span>Postingan Promosi Lapak ({sellerPosts.length})</span>
+                  </h4>
+                  <div className="space-y-3">
+                    {sellerPosts.map((post) => (
+                      <PostCard key={post.id} post={post} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Empty state when no products and no seller posts */}
+              {userProducts.length === 0 && sellerPosts.length === 0 && (
+                userShop ? (
+                  <EmptyState
+                    icon={<Store size={28} />}
+                    title="Belum ada produk atau jasa aktif"
+                    description={`${profile.fullName} telah terdaftar sebagai Seller 99 namun belum memposting produk di etalase.`}
+                  />
+                ) : !isMe ? (
+                  <EmptyState
+                    icon={<Store size={28} />}
+                    title="Belum Membuka Lapak di Seller 99"
+                    description={`${profile.fullName} belum mendaftarkan toko atau memposting produk di direktori Seller 99.`}
+                  />
+                ) : null
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Professional Alumni Database Card Header (Buku Induk Registri) */}
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-brand-primaryDeep text-white rounded-3xl p-5 shadow-lg border border-slate-700/60 relative overflow-hidden">
+              {/* Official Watermark */}
+              <div className="absolute -right-6 -bottom-8 opacity-10 text-white pointer-events-none">
+                <GraduationCap size={160} />
+              </div>
+
+              <div className="relative z-10 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-amber-400/20 border border-amber-300/30 text-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                      <Database size={12} />
+                      <span>Buku Induk Registri Alumni</span>
+                    </span>
+                    <span className="text-[11px] text-slate-300 font-medium">SMAN 59 Jakarta ’99</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 font-mono text-[11px] bg-white/10 px-2.5 py-1 rounded-lg border border-white/15 text-slate-200">
+                    <span>NIA:</span>
+                    <strong className="text-white font-black">{profile.nia || '59990001'}</strong>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-black text-white leading-tight flex items-center gap-2 flex-wrap">
+                    <span>{profile.fullName}</span>
+                    <ProfileCategoryBadge category={profile.profileCategory} size={18} showLabel />
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-1">
+                    Kelas {profile.className || 'SMAN 59'} • Lulusan Tahun 1999 (Angkatan Perak)
+                  </p>
+                </div>
+
+                {/* Verification status footer inside header card */}
+                <div className="pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-300 flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                    <CheckCircle2 size={14} />
+                    <span>Terdaftar & Terverifikasi Resmi di Forsil 99</span>
+                  </div>
+                  <div className="text-slate-300 text-[11px] flex items-center gap-1">
+                    <Shield size={12} className="text-emerald-400" />
+                    <span>Kepatuhan UU PDP No. 27/2022</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-100">
-              <h4 className="font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Media Sosial
-              </h4>
-              <div className="flex items-center gap-3 mt-2">
-                {profile.socialLinks?.instagram && (
-                  <a
-                    href={`https://instagram.com/${profile.socialLinks.instagram}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 text-pink-600 font-semibold hover:underline"
-                  >
-                    <Instagram size={16} />
-                    <span>@{profile.socialLinks.instagram}</span>
-                  </a>
+            {/* A. OWNER PERSPECTIVE: Open all profile fields for user viewing their own profile */}
+            {isMe ? (
+              <div className="p-3.5 bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border border-blue-200 rounded-2xl flex items-center justify-between gap-3 text-xs shadow-2xs flex-wrap">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-brand-primary text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                    <Database size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Buku Induk Registri Profil Anda</p>
+                    <p className="text-[11px] text-slate-600">
+                      Sebagai pemilik akun, seluruh data terbuka lengkap untuk Anda. Rekan alumni lain melihat data Anda sesuai pembatasan kategori:{' '}
+                      <span className="font-bold text-brand-primary capitalize">{profile.profileCategory?.replace('_', ' ')}</span>.
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  href="/profile/edit"
+                  className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-[11px] font-bold shadow-xs transition-colors flex items-center gap-1.5"
+                >
+                  <Edit3 size={13} />
+                  <span>Atur Profil & Privasi</span>
+                </Link>
+              </div>
+            ) : (
+              /* B. VISITOR PERSPECTIVE: Inform about visibility status */
+              profile.canViewDetails !== false && (
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-900">
+                  <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                  <p className="text-[11px] leading-snug">
+                    {profile.profileCategory === 'super_extrov'
+                      ? 'Kanal profil ini dibuka untuk seluruh rekan alumni terverifikasi (Kategori Super Extrov).'
+                      : 'Kanal profil ini dibuka khusus untuk rekan yang saling mengikuti (Kategori Extrov).'}
+                  </p>
+                </div>
+              )
+            )}
+
+            {/* C. VISITOR RESTRICTION GATE: If not owner and profile details are restricted */}
+            {!isMe && profile.canViewDetails === false ? (
+              <div className="space-y-4">
+                {profile.privacyRestriction === 'followers_only' ? (
+                  /* Extrov: Followers Only Lock Card */
+                  <div className="bg-blue-50/60 border border-blue-200 rounded-3xl p-6 text-center space-y-4 shadow-xs">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-100 text-brand-primary flex items-center justify-center shadow-xs">
+                      <Lock size={26} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">
+                        <BadgeCheck size={14} className="text-blue-600" />
+                        <span>Kategori Extrov (Khusus Pengikut)</span>
+                      </div>
+                      <h3 className="font-bold text-slate-900 text-base">Detail Database Alumni Terkunci</h3>
+                      <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+                        {profile.fullName} hanya membagikan nomor kontak WhatsApp, tanggal lahir, dan alamat domisili kepada rekan alumni yang mem-follow akunnya.
+                      </p>
+                    </div>
+                    <div className="pt-1">
+                      <button
+                        onClick={handleToggleFollow}
+                        className="px-6 py-2.5 rounded-xl bg-brand-primary text-white text-xs font-bold shadow hover:bg-brand-primaryDark transition-all inline-flex items-center gap-2 active:scale-95"
+                      >
+                        <UserPlus size={15} />
+                        <span>Ikuti {profile.nickname || profile.fullName} untuk Membuka Detail</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Introv: Private Profile Lock Card */
+                  <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 text-center space-y-3 shadow-xs">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center">
+                      <Lock size={26} />
+                    </div>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200 text-slate-700 text-xs font-bold">
+                      <CheckCircle2 size={14} className="text-slate-500" />
+                      <span>Kategori Introv (Profil Privat)</span>
+                    </div>
+                    <h3 className="font-bold text-slate-900 text-base">Detail Kontak & Domisili Dirahasiakan</h3>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                      Alumni ini memilih untuk mengunci kontak dan alamat domisili dalam database alumni (Mode Privat) sesuai kebijakan privasi Forsil 99.
+                    </p>
+                  </div>
                 )}
-                {profile.socialLinks?.linkedin && (
-                  <a
-                    href={profile.socialLinks.linkedin}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 text-blue-700 font-semibold hover:underline"
-                  >
-                    <Linkedin size={16} />
-                    <span>LinkedIn</span>
-                  </a>
+
+                {/* Masked Preview of Public Directory Record */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-subtle space-y-3 text-xs opacity-80">
+                  <h4 className="font-bold text-slate-500 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <User size={14} className="text-brand-primary" />
+                    <span>I. Data Pokok Siswa (Pratinjau Publik)</span>
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Nama Lengkap</span>
+                      <span className="font-semibold text-slate-800">{profile.fullName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Kelas di SMAN 59</span>
+                      <span className="font-semibold text-slate-800">{profile.className || '1999'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Profesi Saat Ini</span>
+                      <span className="font-semibold text-slate-800">{profile.occupation || 'Alumni'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[11px] block">Nomor Kontak & Alamat</span>
+                      <span className="font-semibold text-slate-400 italic flex items-center gap-1">
+                        <Lock size={12} /> Terkunci
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* D. UNLOCKED FULL DATABASE DOSSIER (Visible for isMe OR unrestricted visitors) */
+              <div className="space-y-4">
+                {/* 1. Data Identitas Pokok Siswa / Alumni */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-subtle space-y-4 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-blue-50 text-brand-primary flex items-center justify-center">
+                        <User size={14} />
+                      </div>
+                      <span>I. DATA IDENTITAS POKOK ALUMNI (BUKU INDUK)</span>
+                    </h4>
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                      REG-1999
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 text-[11px] block">Nama Lengkap Resmi</span>
+                      <span className="font-bold text-slate-900 text-xs block mt-0.5">{profile.fullName}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 text-[11px] block">Nama Panggilan / Alias</span>
+                      <span className="font-semibold text-slate-800 text-xs block mt-0.5">
+                        {profile.nickname ? `"${profile.nickname}"` : '-'}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 text-[11px] block">Nomor Induk Alumni (NIA)</span>
+                      <span className="font-mono font-bold text-brand-primary text-xs block mt-0.5">
+                        {profile.nia || '59990001'}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 text-[11px] block">Kelas & Angkatan</span>
+                      <span className="font-semibold text-slate-800 text-xs block mt-0.5">
+                        Kelas {profile.className || 'SMAN 59'} (Lulusan 1999)
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 text-[11px] block">Tanggal Lahir</span>
+                      <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5 mt-0.5">
+                        <Cake size={13} className="text-amber-500 flex-shrink-0" />
+                        <span>{formatBirthDate(profile.birthDate) || 'Belum diisi'}</span>
+                        {calculateAge(profile.birthDate) && (
+                          <span className="text-slate-400 font-normal">{calculateAge(profile.birthDate)}</span>
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 text-[11px] block">Jenis Kelamin</span>
+                      <span className="font-semibold text-slate-800 text-xs block mt-0.5">
+                        {profile.gender || 'Belum diisi'}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 sm:col-span-2">
+                      <span className="text-slate-400 text-[11px] block">Status Pernikahan</span>
+                      <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5 mt-0.5">
+                        <Heart size={13} className="text-rose-500 flex-shrink-0" />
+                        <span>{profile.maritalStatus || 'Belum diisi'}</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Data Kontak Resmi & Domisili Terkini */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-subtle space-y-4 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <MapPin size={14} />
+                      </div>
+                      <span>II. DATA KONTAK RESMI & DOMISILI TERKINI</span>
+                    </h4>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-100 flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <span className="text-slate-500 text-[11px] block">Nomor WhatsApp Resmi</span>
+                        <span className="font-mono font-bold text-slate-900 text-sm">
+                          {profile.whatsappNumber || 'Tidak ditampilkan'}
+                        </span>
+                      </div>
+                      {profile.whatsappNumber && (
+                        <a
+                          href={getWhatsAppUrl(profile.whatsappNumber)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs transition-colors"
+                        >
+                          <Phone size={13} />
+                          <span>Chat WhatsApp</span>
+                          <ExternalLink size={11} />
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="text-slate-400 text-[11px] block">Alamat Domisili Lengkap</span>
+                        <span className="font-semibold text-slate-800 leading-relaxed block mt-0.5">
+                          {profile.currentAddress || 'Belum diisi'}
+                        </span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="text-slate-400 text-[11px] block">Kota / Wilayah Domisili</span>
+                        <span className="font-semibold text-slate-800 text-xs block mt-0.5">
+                          {profile.city || 'Jakarta'} {profile.province ? `• ${profile.province}` : ''}
+                        </span>
+                      </div>
+                    </div>
+
+                    {(profile.email || (isMe && user?.email)) && (
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <span className="text-slate-400 text-[11px] block">Alamat Email Terdaftar</span>
+                        <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5 mt-0.5">
+                          <Mail size={13} className="text-brand-primary flex-shrink-0" />
+                          <span>{profile.email || user?.email}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3. Profil Karir & Profesional */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-subtle space-y-4 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <Briefcase size={14} />
+                      </div>
+                      <span>III. KARIR & PROFESIONAL ALUMNI</span>
+                    </h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 text-[11px] block">Pekerjaan / Profesi Saat Ini</span>
+                      <span className="font-bold text-slate-900 text-xs block mt-0.5">
+                        {profile.occupation || 'Belum diisi'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 text-[11px] block">Nama Instansi / Perusahaan</span>
+                      <span className="font-semibold text-slate-800 text-xs block mt-0.5">
+                        {profile.company || 'Belum diisi'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Minat, Hobi & Silaturahmi */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-subtle space-y-4 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <h4 className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <Sparkles size={14} />
+                      </div>
+                      <span>IV. MINAT, HOBI & SILATURAHMI</span>
+                    </h4>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 text-[11px] block mb-1.5 font-medium">Hobi & Kegemaran:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {profile.hobbies && profile.hobbies.length > 0 ? (
+                        profile.hobbies.map((h, i) => (
+                          <span
+                            key={i}
+                            className="px-3 py-1 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg text-xs font-semibold"
+                          >
+                            {h}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-slate-400 italic">Belum diisi</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {profile.skills && profile.skills.length > 0 && (
+                    <div className="pt-2 border-t border-slate-50">
+                      <span className="text-slate-400 text-[11px] block mb-1.5 font-medium">Keahlian Tambahan:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {profile.skills.map((s, i) => (
+                          <span
+                            key={i}
+                            className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-medium"
+                          >
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {profile.bio && (
+                    <div className="pt-2 border-t border-slate-50">
+                      <span className="text-slate-400 text-[11px] block mb-1 font-medium">Bio Silaturahmi:</span>
+                      <p className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-700 leading-relaxed whitespace-pre-line italic">
+                        "{profile.bio}"
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Kanal Media Sosial & Kepatuhan */}
+                {(profile.socialLinks?.instagram || profile.socialLinks?.linkedin) && (
+                  <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-subtle space-y-3 text-xs">
+                    <h4 className="font-bold text-slate-900 text-xs">
+                      V. JEJARING MEDIA SOSIAL ALUMNI
+                    </h4>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {profile.socialLinks?.instagram && (
+                        <a
+                          href={`https://instagram.com/${profile.socialLinks.instagram}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2 text-pink-600 font-bold hover:underline bg-pink-50 px-3.5 py-2 rounded-xl text-xs border border-pink-100"
+                        >
+                          <Instagram size={16} />
+                          <span>@{profile.socialLinks.instagram}</span>
+                        </a>
+                      )}
+                      {profile.socialLinks?.linkedin && (
+                        <a
+                          href={profile.socialLinks.linkedin}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2 text-blue-700 font-bold hover:underline bg-blue-50 px-3.5 py-2 rounded-xl text-xs border border-blue-100"
+                        >
+                          <Linkedin size={16} />
+                          <span>Profil LinkedIn</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
@@ -421,6 +1095,17 @@ export default function ProfileDetailPage() {
             setFollowersCount(status.followersCount);
             setFollowingCount(status.followingCount);
           }
+        }}
+      />
+
+      {/* Seller Registration Modal */}
+      <SellerRegistrationModal
+        isOpen={isSellerModalOpen}
+        onClose={() => setIsSellerModalOpen(false)}
+        initialShop={userShop}
+        onSuccess={(newShop) => {
+          setUserShop(newShop);
+          loadProfileData();
         }}
       />
     </div>

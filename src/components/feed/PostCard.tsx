@@ -28,6 +28,7 @@ import { useAuth } from '@/context/AuthContext';
 import { reactToPost, addComment, deletePost, fetchComments, reportPost } from '@/services/postService';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge, GoldBadge } from '@/components/ui/VerifiedBadge';
+import { ProfileCategoryBadge } from '@/components/ui/ProfileCategoryBadge';
 import { toast } from 'sonner';
 
 interface PostCardProps {
@@ -307,7 +308,11 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
               >
                 {authorName}
               </Link>
-              <VerifiedBadge size={14} />
+              {post.author?.profile?.profileCategory ? (
+                <ProfileCategoryBadge category={post.author.profile.profileCategory} size={15} />
+              ) : (
+                <VerifiedBadge size={14} />
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 text-xs text-slate-500">

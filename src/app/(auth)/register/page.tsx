@@ -22,8 +22,13 @@ import {
   X,
   Loader2,
   ShieldCheck,
+  RotateCcw,
+  Timer,
+  ArrowLeft,
+  MailCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useReleaseDate } from '@/hooks/useReleaseDate';
 
 const CLASSES = [
   '3 IPA 1',
@@ -39,6 +44,14 @@ const CLASSES = [
 export default function RegisterPage() {
   const router = useRouter();
   const { login } = useAuth();
+  const { isReleased, isCountdownEnabled, isLoading: releaseLoading } = useReleaseDate();
+
+  // Guard: Jika belum rilis dan countdown aktif, blokir akses register dan alihkan ke /countdown
+  useEffect(() => {
+    if (!releaseLoading && isCountdownEnabled && !isReleased) {
+      router.replace('/countdown');
+    }
+  }, [isReleased, isCountdownEnabled, releaseLoading, router]);
 
   const [fullName, setFullName] = useState<string>('');
   const [nickname, setNickname] = useState<string>('');
@@ -58,6 +71,41 @@ export default function RegisterPage() {
 
   const [selfieBase64, setSelfieBase64] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // OTP Verification Step State
+  const [step, setStep] = useState<'form' | 'otp'>('form');
+  const [otpCode, setOtpCode] = useState<string>('');
+  const [otpCooldown, setOtpCooldown] = useState<number>(0);
+  const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
+
+  // Restore OTP cooldown timer if page refreshed
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedUntil = sessionStorage.getItem('ruang59_otp_cooldown_until');
+    if (storedUntil) {
+      const remaining = Math.ceil((parseInt(storedUntil, 10) - Date.now()) / 1000);
+      if (remaining > 0) {
+        setOtpCooldown(remaining);
+      } else {
+        sessionStorage.removeItem('ruang59_otp_cooldown_until');
+      }
+    }
+  }, []);
+
+  // Tick down OTP cooldown
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setOtpCooldown((prev) => {
+        if (prev <= 1) {
+          sessionStorage.removeItem('ruang59_otp_cooldown_until');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [otpCooldown]);
 
   // Preload reCAPTCHA v3
   useEffect(() => {
@@ -166,7 +214,8 @@ export default function RegisterPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Step 1 Submit: Validate and Request OTP
+  const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
       toast.error('Nama lengkap wajib diisi.');
@@ -178,6 +227,10 @@ export default function RegisterPage() {
     }
     if (!phone.trim()) {
       toast.error('Nomor WhatsApp wajib diisi.');
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      toast.error('Alamat email aktif wajib diisi untuk verifikasi OTP.');
       return;
     }
     if (!password || password.length < 6) {
@@ -193,18 +246,71 @@ export default function RegisterPage() {
       return;
     }
 
+    setIsSendingOtp(true);
+    try {
+      const recaptchaToken = await executeRecaptchaV3('register_otp');
+      const { sendRegistrationOtp } = await import('@/services/authService');
+      const res = await sendRegistrationOtp(email.trim(), fullName.trim(), recaptchaToken || undefined);
+
+      if (res.success) {
+        setStep('otp');
+        setOtpCooldown(60);
+        sessionStorage.setItem('ruang59_otp_cooldown_until', (Date.now() + 60 * 1000).toString());
+        toast.success(`Kode OTP telah dikirimkan ke ${email.trim()}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengirimkan kode OTP ke email.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // Resend OTP handler with 1-minute cooldown
+  const handleResendOtp = async () => {
+    if (otpCooldown > 0) {
+      toast.error(`Harap tunggu ${otpCooldown} detik sebelum meminta kirim ulang OTP.`);
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const recaptchaToken = await executeRecaptchaV3('register_otp');
+      const { sendRegistrationOtp } = await import('@/services/authService');
+      const res = await sendRegistrationOtp(email.trim(), fullName.trim(), recaptchaToken || undefined);
+
+      if (res.success) {
+        setOtpCooldown(60);
+        sessionStorage.setItem('ruang59_otp_cooldown_until', (Date.now() + 60 * 1000).toString());
+        toast.success(`Kode OTP baru telah dikirimkan ke ${email.trim()}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengirimkan ulang kode OTP.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // Step 2 Submit: Verify OTP and Register Account
+  const handleVerifyOtpAndRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanOtp = otpCode.trim();
+    if (!cleanOtp || cleanOtp.length < 4) {
+      toast.error('Masukkan 6 digit kode OTP yang diterima di email.');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Execute reCAPTCHA v3 in background
       const recaptchaToken = await executeRecaptchaV3('register');
+      const { verifyRegistrationOtpAndRegister } = await import('@/services/authService');
 
-      // 1. Direct register to create account (pending review & referral email dispatch)
-      await registerAlumniUser({
+      await verifyRegistrationOtpAndRegister({
+        otpCode: cleanOtp,
         fullName: fullName.trim(),
         nickname: nickname.trim() || undefined,
         className,
         phone: phone.trim(),
-        email: email.trim() || undefined,
+        email: email.trim(),
         password,
         graduationYear: 1999,
         referralAccountId: referralId,
@@ -213,10 +319,11 @@ export default function RegisterPage() {
         recaptchaToken: recaptchaToken || undefined,
       });
 
-      toast.success('Pendaftaran alumni terkirim! Menunggu konfirmasi referral via email.');
+      sessionStorage.removeItem('ruang59_otp_cooldown_until');
+      toast.success('Pendaftaran alumni terkirim & email tervalidasi! Menunggu konfirmasi referral via email.');
       router.push('/awaiting-approval');
     } catch (err: any) {
-      toast.error(err.message || 'Pendaftaran gagal. Silakan periksa data Anda.');
+      toast.error(err.message || 'Verifikasi OTP gagal. Silakan periksa kembali kode OTP Anda.');
     } finally {
       setIsLoading(false);
     }
@@ -234,262 +341,372 @@ export default function RegisterPage() {
               className="h-14 w-auto object-contain mx-auto"
             />
           </Link>
-          <h1 className="text-xl font-bold text-slate-900">Registrasi Alumni Baru</h1>
+          <h1 className="text-xl font-bold text-slate-900">
+            {step === 'otp' ? 'Verifikasi Email Alumni' : 'Registrasi Alumni Baru'}
+          </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Khusus Alumni SMAN 59 Jakarta Angkatan 1999 (Perak)
+            {step === 'otp'
+              ? 'Langkah Terakhir: Masukkan kode OTP untuk memvalidasi keaktifan email Anda'
+              : 'Khusus Alumni SMAN 59 Jakarta Angkatan 1999 (Perak)'}
           </p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-card space-y-4">
-          <AppInput
-            label="Nama Lengkap Sesuai Ijazah / Buku Kenangan"
-            placeholder="Contoh: Steven Rahardjo"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            leftIcon={<User size={16} />}
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-3">
-            <AppInput
-              label="Nama Panggilan"
-              placeholder="Contoh: Steve"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-            />
-
-            <div className="space-y-1.5 text-left">
-              <label className="block text-xs font-semibold text-slate-700">
-                Kelas Terakhir (1999)
-              </label>
-              <select
-                value={className}
-                onChange={(e) => setClassName(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-brand-primary focus:outline-none"
-              >
-                {CLASSES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+        {step === 'otp' ? (
+          /* STEP 2: OTP Verification Screen */
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-card space-y-5 text-center">
+            <div className="w-16 h-16 bg-blue-50 text-brand-primary rounded-2xl flex items-center justify-center mx-auto shadow-xs border border-blue-100">
+              <MailCheck size={32} />
             </div>
-          </div>
 
-          <AppInput
-            label="Nomor WhatsApp Aktif"
-            placeholder="Contoh: 081298765432"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            leftIcon={<Phone size={16} />}
-            required
-          />
-
-          <AppInput
-            label="Alamat Email (Opsional)"
-            type="email"
-            placeholder="nama@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            leftIcon={<Mail size={16} />}
-          />
-
-          <AppInput
-            label="Kata Sandi Baru"
-            type="password"
-            placeholder="Minimal 6 karakter"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            leftIcon={<Lock size={16} />}
-            required
-          />
-
-          {/* Referral Selection (Wajib: Cari Rekan Seangkatan Min 3 Huruf) */}
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <label className="block text-xs font-semibold text-slate-700">
-              Pilih Rekan Alumni Sebagai Referensi Verifikasi: <span className="text-rose-500 font-bold">* (Wajib)</span>
-            </label>
-
-            {selectedReferral ? (
-              /* Selected Referral Card */
-              <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-white border border-emerald-300 flex items-center justify-center overflow-hidden flex-shrink-0 text-emerald-700 font-bold text-xs">
-                    {selectedReferral.profilePhotoUrl ? (
-                      <img
-                        src={selectedReferral.profilePhotoUrl}
-                        alt={selectedReferral.fullName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span>{selectedReferral.fullName?.substring(0, 2).toUpperCase()}</span>
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-slate-900">{selectedReferral.fullName}</span>
-                      <CheckCircle2 size={13} className="text-emerald-600 flex-shrink-0" />
-                    </div>
-                    <p className="text-[11px] text-emerald-700 font-medium">
-                      {selectedReferral.className || 'Alumni 99'} • Referral Terpilih
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleClearReferral}
-                  className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-rose-600 bg-white border border-slate-200 rounded-lg hover:bg-rose-50 transition-colors"
-                >
-                  Ganti Rekan
-                </button>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Kode OTP Telah Dikirim</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Kami telah mengirimkan 6 digit kode OTP verifikasi ke email:
+              </p>
+              <div className="text-xs font-bold text-slate-800 mt-2 break-all bg-slate-100 py-1.5 px-3 rounded-lg inline-block border border-slate-200/60">
+                {email}
               </div>
-            ) : (
-              /* Search Input Combobox */
-              <div className="space-y-1.5 relative">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={referralQuery}
-                    onChange={(e) => setReferralQuery(e.target.value)}
-                    placeholder="Ketik minimal 3 huruf nama rekan seangkatan '99..."
-                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 py-2.5 text-xs text-slate-900 focus:border-brand-primary focus:outline-none placeholder:text-slate-400"
-                  />
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  {isSearching && (
-                    <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-primary animate-spin" />
-                  )}
-                  {referralQuery && !isSearching && (
-                    <button
-                      type="button"
-                      onClick={() => setReferralQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
+            </div>
 
-                {/* Search Hint when < 3 characters */}
-                {referralQuery.trim().length > 0 && referralQuery.trim().length < 3 && (
-                  <p className="text-[11px] text-amber-600 italic px-1">
-                    ✍️ Masukkan minimal 3 huruf untuk mencari teman seangkatan (misal: "Stev", "Budi", "Rina").
-                  </p>
-                )}
-
-                {/* Dropdown Results */}
-                {referralQuery.trim().length >= 3 && !isSearching && (
-                  <div className="mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg divide-y divide-slate-100 z-30">
-                    {searchResults.length > 0 ? (
-                      searchResults.map((a) => (
-                        <button
-                          key={a.accountId}
-                          type="button"
-                          onClick={() => handleSelectReferral(a)}
-                          className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50/80 active:bg-blue-100 flex items-center justify-between transition-colors group"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center text-[10px] font-bold text-slate-600">
-                              {a.profilePhotoUrl ? (
-                                <img src={a.profilePhotoUrl} alt={a.fullName} className="w-full h-full object-cover" />
-                              ) : (
-                                <span>{a.fullName?.substring(0, 2).toUpperCase()}</span>
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-xs font-bold text-slate-900 group-hover:text-brand-primary transition-colors">
-                                {a.fullName}
-                              </p>
-                              <p className="text-[10px] text-slate-500">
-                                {a.className || 'Alumni 1999'}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-semibold text-brand-primary bg-blue-50 group-hover:bg-brand-primary group-hover:text-white px-2 py-1 rounded-md transition-all">
-                            Pilih Rekan
-                          </span>
-                        </button>
-                      ))
-                    ) : hasSearched ? (
-                      <div className="p-3 text-center text-xs text-slate-500">
-                        Tidak ditemukan alumni dengan nama "<strong>{referralQuery}</strong>". Pastikan ejaan nama teman seangkatan Anda benar.
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-
-                <p className="text-[11px] text-slate-400">
-                  Rekan alumni terpilih akan menerima notifikasi email untuk memvalidasi keanggotaan Anda.
+            <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4 text-left">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-2 text-center">
+                  Masukkan 6 Digit Kode OTP
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="••••••"
+                  className="w-full text-center text-3xl font-mono font-extrabold tracking-[0.4em] py-3.5 px-4 rounded-xl border-2 border-slate-200 focus:border-brand-primary focus:outline-none bg-slate-50 focus:bg-white text-slate-900 transition-all shadow-inner"
+                  autoFocus
+                  required
+                />
+                <p className="text-[11px] text-slate-400 mt-2 text-center">
+                  ⏱️ Kode OTP berlaku selama 10 menit.
                 </p>
               </div>
-            )}
-          </div>
 
-          {/* Selfie Photo Upload (Wajib: Galeri / Kamera / Drive) */}
-          <div className="pt-2 border-t border-slate-100 space-y-2">
-            <label className="block text-xs font-semibold text-slate-700">
-              Foto Selfie Wajah / Profil: <span className="text-rose-500 font-bold">* (Wajib)</span>
-            </label>
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Option 1: Galeri / File HP / Google Drive */}
-              <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-all border border-slate-200 shadow-2xs">
-                <ImageIcon size={16} className="text-brand-primary" />
-                <span>Buka Galeri Foto / File</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleSelfieUpload}
-                  className="hidden"
-                />
-              </label>
-
-              {/* Option 2: Kamera Langsung */}
-              <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-all border border-slate-200 shadow-2xs">
-                <Camera size={16} className="text-amber-600" />
-                <span>Ambil Kamera</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="user"
-                  onChange={handleSelfieUpload}
-                  className="hidden"
-                />
-              </label>
-
-              {selfieBase64 ? (
-                <div className="flex items-center gap-2 ml-auto">
-                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xs">
-                    <img src={selfieBase64} alt="Selfie" className="w-full h-full object-cover" />
+              {/* 1-Minute Resend OTP Cooldown */}
+              <div className="py-2 text-center">
+                {otpCooldown > 0 ? (
+                  <div className="inline-flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200/80">
+                    <Timer size={14} className="animate-spin text-brand-primary" />
+                    <span>Kirim ulang kode dalam (00:{otpCooldown < 10 ? `0${otpCooldown}` : otpCooldown})</span>
                   </div>
-                  <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                    <CheckCircle2 size={13} /> Foto Siap
-                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={isSendingOtp}
+                    className="text-xs text-brand-primary font-bold hover:underline inline-flex items-center gap-1 transition"
+                  >
+                    <RotateCcw size={13} />
+                    <span>{isSendingOtp ? 'Mengirim...' : 'Kirim Ulang Kode OTP ke Email'}</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 py-0.5">
+                <ShieldCheck size={14} className="text-brand-primary" />
+                <span>Dilindungi oleh Google reCAPTCHA v3</span>
+              </div>
+
+              <AppButton
+                type="submit"
+                variant="gold"
+                size="lg"
+                isLoading={isLoading}
+                disabled={otpCode.length < 4}
+                className="w-full"
+              >
+                Verifikasi & Selesaikan Pendaftaran
+              </AppButton>
+            </form>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <button
+                type="button"
+                onClick={() => setStep('form')}
+                className="text-slate-500 hover:text-slate-800 font-semibold inline-flex items-center gap-1 transition"
+              >
+                <ArrowLeft size={13} />
+                <span>Ubah Data / Email</span>
+              </button>
+
+              <span className="text-slate-400 text-[11px]">
+                Cek juga folder Spam
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* STEP 1: Registration Form */
+          <form onSubmit={handleRequestOtp} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-card space-y-4">
+            <AppInput
+              label="Nama Lengkap Sesuai Ijazah / Buku Kenangan"
+              placeholder="Contoh: Steven Rahardjo"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              leftIcon={<User size={16} />}
+              required
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <AppInput
+                label="Nama Panggilan"
+                placeholder="Contoh: Steve"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+              />
+
+              <div className="space-y-1.5 text-left">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Kelas Terakhir (1999)
+                </label>
+                <select
+                  value={className}
+                  onChange={(e) => setClassName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-brand-primary focus:outline-none"
+                >
+                  {CLASSES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <AppInput
+              label="Nomor WhatsApp Aktif"
+              placeholder="Contoh: 081298765432"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              leftIcon={<Phone size={16} />}
+              required
+            />
+
+            <div>
+              <AppInput
+                label="Alamat Email Aktif (Akun Google / Pribadi)"
+                type="email"
+                placeholder="nama@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                leftIcon={<Mail size={16} />}
+                required
+              />
+              <p className="text-[11px] text-brand-primary mt-1 font-medium">
+                * Kode OTP 6 digit akan dikirimkan ke email ini untuk memvalidasi keaktifan akun.
+              </p>
+            </div>
+
+            <AppInput
+              label="Kata Sandi Akun Baru"
+              type="password"
+              placeholder="Minimal 6 karakter"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              leftIcon={<Lock size={16} />}
+              required
+            />
+
+            {/* Referral Selection (Wajib: Cari Rekan Seangkatan Min 3 Huruf) */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <label className="block text-xs font-semibold text-slate-700">
+                Pilih Rekan Alumni Sebagai Referensi Verifikasi: <span className="text-rose-500 font-bold">* (Wajib)</span>
+              </label>
+
+              {selectedReferral ? (
+                /* Selected Referral Card */
+                <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white border border-emerald-300 flex items-center justify-center overflow-hidden flex-shrink-0 text-emerald-700 font-bold text-xs">
+                      {selectedReferral.profilePhotoUrl ? (
+                        <img
+                          src={selectedReferral.profilePhotoUrl}
+                          alt={selectedReferral.fullName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span>{selectedReferral.fullName?.substring(0, 2).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-900">{selectedReferral.fullName}</span>
+                        <CheckCircle2 size={13} className="text-emerald-600 flex-shrink-0" />
+                      </div>
+                      <p className="text-[11px] text-emerald-700 font-medium">
+                        {selectedReferral.className || 'Alumni 99'} • Referral Terpilih
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleClearReferral}
+                    className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-rose-600 bg-white border border-slate-200 rounded-lg hover:bg-rose-50 transition-colors"
+                  >
+                    Ganti Rekan
+                  </button>
                 </div>
               ) : (
-                <span className="text-[11px] text-rose-500 italic ml-auto">Belum ada foto</span>
+                /* Search Input Combobox */
+                <div className="space-y-1.5 relative">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={referralQuery}
+                      onChange={(e) => setReferralQuery(e.target.value)}
+                      placeholder="Ketik minimal 3 huruf nama rekan seangkatan '99..."
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 py-2.5 text-xs text-slate-900 focus:border-brand-primary focus:outline-none placeholder:text-slate-400"
+                    />
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    {isSearching && (
+                      <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-primary animate-spin" />
+                    )}
+                    {referralQuery && !isSearching && (
+                      <button
+                        type="button"
+                        onClick={() => setReferralQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Search Hint when < 3 characters */}
+                  {referralQuery.trim().length > 0 && referralQuery.trim().length < 3 && (
+                    <p className="text-[11px] text-amber-600 italic px-1">
+                      ✍️ Masukkan minimal 3 huruf untuk mencari teman seangkatan (misal: "Stev", "Budi", "Rina").
+                    </p>
+                  )}
+
+                  {/* Dropdown Results */}
+                  {referralQuery.trim().length >= 3 && !isSearching && (
+                    <div className="mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg divide-y divide-slate-100 z-30">
+                      {searchResults.length > 0 ? (
+                        searchResults.map((a) => (
+                          <button
+                            key={a.accountId}
+                            type="button"
+                            onClick={() => handleSelectReferral(a)}
+                            className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50/80 active:bg-blue-100 flex items-center justify-between transition-colors group"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center text-[10px] font-bold text-slate-600">
+                                {a.profilePhotoUrl ? (
+                                  <img src={a.profilePhotoUrl} alt={a.fullName} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span>{a.fullName?.substring(0, 2).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-900 group-hover:text-brand-primary transition-colors">
+                                  {a.fullName}
+                                </p>
+                                <p className="text-[10px] text-slate-500">
+                                  {a.className || 'Alumni 1999'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-semibold text-brand-primary bg-blue-50 group-hover:bg-brand-primary group-hover:text-white px-2 py-1 rounded-md transition-all">
+                              Pilih Rekan
+                            </span>
+                          </button>
+                        ))
+                      ) : hasSearched ? (
+                        <div className="p-3 text-center text-xs text-slate-500">
+                          Tidak ditemukan alumni dengan nama "<strong>{referralQuery}</strong>". Pastikan ejaan nama teman seangkatan Anda benar.
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-slate-400">
+                    Rekan alumni terpilih akan menerima notifikasi email untuk memvalidasi keanggotaan Anda.
+                  </p>
+                </div>
               )}
             </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              💡 Pilih <strong>Buka Galeri Foto</strong> untuk memilih foto dari galeri HP / Google Photos / Google Drive, atau <strong>Ambil Kamera</strong> untuk foto langsung.
+
+            {/* Selfie Photo Upload (Wajib: Galeri / Kamera / Drive) */}
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <label className="block text-xs font-semibold text-slate-700">
+                Foto Selfie Wajah / Profil: <span className="text-rose-500 font-bold">* (Wajib)</span>
+              </label>
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Option 1: Galeri / File HP / Google Drive */}
+                <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-all border border-slate-200 shadow-2xs">
+                  <ImageIcon size={16} className="text-brand-primary" />
+                  <span>Buka Galeri Foto / File</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleSelfieUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Option 2: Kamera Langsung */}
+                <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 rounded-xl cursor-pointer text-xs font-semibold text-slate-700 transition-all border border-slate-200 shadow-2xs">
+                  <Camera size={16} className="text-amber-600" />
+                  <span>Ambil Kamera</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    onChange={handleSelfieUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                {selfieBase64 ? (
+                  <div className="flex items-center gap-2 ml-auto">
+                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xs">
+                      <img src={selfieBase64} alt="Selfie" className="w-full h-full object-cover" />
+                    </div>
+                    <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                      <CheckCircle2 size={13} /> Foto Siap
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[11px] text-rose-500 italic ml-auto">Belum ada foto</span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                💡 Pilih <strong>Buka Galeri Foto</strong> untuk memilih foto dari galeri HP / Google Photos / Google Drive, atau <strong>Ambil Kamera</strong> untuk foto langsung.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 py-1">
+              <ShieldCheck size={14} className="text-brand-primary" />
+              <span>Dilindungi oleh Google reCAPTCHA v3</span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 text-center leading-relaxed pt-1">
+              Dengan melanjutkan, Anda menyetujui{' '}
+              <Link href="/privacy" target="_blank" className="text-brand-primary font-bold hover:underline inline-flex items-center gap-0.5">
+                <span>Kebijakan Privasi & UU PDP</span>
+              </Link>{' '}
+              komunitas Forsil 99.
             </p>
-          </div>
 
-          <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 py-1">
-            <ShieldCheck size={14} className="text-brand-primary" />
-            <span>Dilindungi oleh Google reCAPTCHA v3</span>
-          </div>
-
-          <AppButton
-            type="submit"
-            variant="gold"
-            size="lg"
-            isLoading={isLoading}
-            className="w-full mt-2"
-          >
-            Kirim Pendaftaran Alumni
-          </AppButton>
-        </form>
+            <AppButton
+              type="submit"
+              variant="gold"
+              size="lg"
+              isLoading={isSendingOtp}
+              className="w-full mt-2"
+            >
+              Lanjut ke Verifikasi Email (OTP)
+            </AppButton>
+          </form>
+        )}
 
         <div className="text-center mt-4">
           <Link href="/login" className="text-xs text-slate-600 hover:text-brand-primary font-semibold">

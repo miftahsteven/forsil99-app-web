@@ -7,27 +7,61 @@ import { Header } from './Header';
 import { BottomNavigation } from './BottomNavigation';
 import { Toaster } from 'sonner';
 
-const PUBLIC_ROUTES = ['/login', '/register', '/awaiting-approval'];
+import { hasSeenWelcome } from '@/config/releaseConfig';
+import { useReleaseDate } from '@/hooks/useReleaseDate';
+
+const PUBLIC_ROUTES = ['/login', '/register', '/awaiting-approval', '/countdown'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isReleased, isCountdownEnabled, isLoading: releaseLoading, targetDateIso } = useReleaseDate();
 
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+  const countdownActive = isCountdownEnabled && !isReleased;
+  const isOverallLoading = authLoading || releaseLoading;
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isOverallLoading) return;
 
-    if (!isAuthenticated && !isPublicRoute) {
-      router.replace('/login');
-    } else if (isAuthenticated && (pathname === '/login' || pathname === '/register')) {
+    if (!isAuthenticated) {
+      if (countdownActive) {
+        // Sebelum rilis: kunci semua halaman (termasuk /login dan /register), alihkan ke /countdown
+        if (pathname !== '/countdown') {
+          router.replace('/countdown');
+          return;
+        }
+      } else {
+        // Pasca rilis atau countdown dimatikan: arahkan ke login jika membuka halaman terproteksi
+        if (!isPublicRoute) {
+          router.replace('/login');
+          return;
+        }
+      }
+    } else if (isAuthenticated && (pathname === '/login' || pathname === '/register' || pathname === '/countdown')) {
       router.replace('/');
     }
-  }, [isAuthenticated, isLoading, isPublicRoute, pathname, router]);
+  }, [isAuthenticated, isOverallLoading, isPublicRoute, pathname, router, countdownActive, targetDateIso]);
+
+  // Jika belum rilis dan belum autentikasi, blokir tampilan halaman selain /countdown (termasuk /login & /register)
+  if (!isAuthenticated && countdownActive && pathname !== '/countdown') {
+    return (
+      <div className="min-h-screen bg-[#050814] flex flex-col items-center justify-center p-4">
+        <div className="text-center space-y-3">
+          <img
+            src="/images/forsil99apps.png"
+            alt="Forsil 99"
+            className="h-16 w-auto object-contain mx-auto"
+          />
+          <div className="w-6 h-6 border-2 border-sky-400 border-t-transparent rounded-full animate-spin mx-auto mt-2" />
+        </div>
+      </div>
+    );
+  }
 
   // Loading state when checking authentication
-  if (isLoading && !isPublicRoute) {
+  if (authLoading && !isPublicRoute) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <div className="text-center space-y-3">
@@ -54,6 +88,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
           <div className="w-6 h-6 border-2 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mt-2" />
         </div>
+      </div>
+    );
+  }
+
+  // Halaman Countdown ditampilkan Full Screen edge-to-edge
+  if (pathname === '/countdown') {
+    return (
+      <div className="min-h-screen w-full bg-[#050814]">
+        {children}
+        <Toaster position="top-center" richColors />
       </div>
     );
   }

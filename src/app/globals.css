@@ -49,3 +49,199 @@
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* ==========================================================
+   3D SPLIT-FLAP COUNTDOWN & AVENGERS FUTURISTIC STYLES
+   ========================================================== */
+
+.font-orbitron {
+  font-family: 'Orbitron', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.font-rajdhani {
+  font-family: 'Rajdhani', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.font-bebas {
+  font-family: 'Bebas Neue', cursive, sans-serif;
+}
+
+/* 3D Flip Card Container */
+.flip-card-3d {
+  position: relative;
+  perspective: 1200px;
+  -webkit-perspective: 1200px;
+}
+
+/* Base flap half */
+.flip-half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  justify-content: center;
+}
+
+.flip-half-top {
+  top: 0;
+  align-items: flex-end;
+  transform-origin: 50% 100%;
+}
+
+.flip-half-bottom {
+  bottom: 0;
+  align-items: flex-start;
+  transform-origin: 50% 0%;
+}
+
+/* Inner digit alignment inside 50% height halves */
+.flip-digit-top {
+  transform: translateY(50%);
+  line-height: 1;
+}
+
+.flip-digit-bottom {
+  transform: translateY(-50%);
+  line-height: 1;
+}
+
+/* Flip Animations */
+@keyframes flipFoldDown {
+  0% {
+    transform: rotateX(0deg);
+  }
+  100% {
+    transform: rotateX(-90deg);
+  }
+}
+
+@keyframes flipUnfoldDown {
+  0% {
+    transform: rotateX(90deg);
+  }
+  100% {
+    transform: rotateX(0deg);
+  }
+}
+
+.animate-flip-top {
+  animation: flipFoldDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-flip-bottom {
+  animation: flipUnfoldDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s forwards;
+}
+
+/* Avengers HUD Elements & Keyframes */
+@keyframes hudScanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(1000%);
+  }
+}
+
+@keyframes hudPulseGlow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes hudRotateClockwise {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes hudRotateCounter {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-scanline {
+  animation: hudScanline 8s linear infinite;
+}
+
+.animate-hud-pulse {
+  animation: hudPulseGlow 3s ease-in-out infinite;
+}
+
+.animate-rotate-cw {
+  animation: hudRotateClockwise 25s linear infinite;
+}
+
+.animate-rotate-ccw {
+  animation: hudRotateCounter 35s linear infinite;
+}
+
+/* Subtle hex grid pattern */
+.bg-cyber-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(56, 189, 248, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 189, 248, 0.05) 1px, transparent 1px);
+}
+
+.bg-radial-vignette {
+  background: radial-gradient(circle at 50% 45%, rgba(14, 165, 233, 0.12) 0%, rgba(10, 15, 30, 0.85) 65%, #050814 100%);
+}
+
+/* ==========================================================
+   APP-LIKE NOTIFICATION TOAST & BADGE ANIMATIONS
+   ========================================================== */
+
+@keyframes slideDownNotification {
+  0% {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.96);
+  }
+  60% {
+    transform: translateY(4px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes scaleInBadge {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  70% {
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-slide-down {
+  animation: slideDownNotification 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleInBadge 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+
