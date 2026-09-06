@@ -10,10 +10,14 @@ export function useReleaseDate() {
   // Fallback awal dari .env atau default
   const defaultParsed = parseFlexibleDate(RELEASE_CONFIG.targetDate) || new Date('2026-09-09T19:09:00+07:00');
 
+  const envCountdownSetting = process.env.NEXT_PUBLIC_ENABLE_COUNTDOWN;
+  const isEnvLocked = envCountdownSetting === 'true' || envCountdownSetting === 'false';
+  const initialEnabled = isEnvLocked ? envCountdownSetting === 'true' : RELEASE_CONFIG.isCountdownEnabled;
+
   const [targetDate, setTargetDate] = useState<Date>(defaultParsed);
   const [source, setSource] = useState<'rtdb' | 'env'>('env');
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isCountdownEnabled, setIsCountdownEnabled] = useState<boolean>(RELEASE_CONFIG.isCountdownEnabled);
+  const [isCountdownEnabled, setIsCountdownEnabled] = useState<boolean>(initialEnabled);
 
   // 1. Sinkronisasi Realtime dengan Firebase Realtime Database (/releasedate)
   useEffect(() => {
@@ -43,17 +47,21 @@ export function useReleaseDate() {
         }
       );
 
-      const unsubscribeEnable = onValue(
-        enableCountdownRef,
-        (snapshot) => {
-          if (!isMounted) return;
-          const val = snapshot.val();
-          if (val !== null && val !== undefined) {
-            setIsCountdownEnabled(val === true || val === 'true');
-          }
-        },
-        () => {}
-      );
+      // Hanya listen enablecountdown dari RTDB jika env tidak dikunci eksplisit 'true' atau 'false'
+      let unsubscribeEnable = () => {};
+      if (!isEnvLocked) {
+        unsubscribeEnable = onValue(
+          enableCountdownRef,
+          (snapshot) => {
+            if (!isMounted) return;
+            const val = snapshot.val();
+            if (val !== null && val !== undefined) {
+              setIsCountdownEnabled(val === true || val === 'true');
+            }
+          },
+          () => {}
+        );
+      }
 
       return () => {
         isMounted = false;
@@ -64,7 +72,7 @@ export function useReleaseDate() {
       console.warn('Error saat menginisialisasi listener Firebase RTDB:', err);
       setIsLoading(false);
     }
-  }, []);
+  }, [isEnvLocked]);
 
   const isCurrentReleased = !isCountdownEnabled || (Date.now() >= targetDate.getTime());
   const formattedLabel = formatReleaseText(targetDate);

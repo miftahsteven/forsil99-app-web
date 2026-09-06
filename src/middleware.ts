@@ -12,24 +12,28 @@ const RTDB_URL =
   'https://ruang59-e9dde-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 async function checkIsServerReleased(): Promise<boolean> {
-  // Jika countdown dimatikan secara global di env
+  // 1. Jika countdown dimatikan secara eksplisit di env
   if (process.env.NEXT_PUBLIC_ENABLE_COUNTDOWN === 'false') {
     return true;
   }
+
+  const isExplicitlyEnabled = process.env.NEXT_PUBLIC_ENABLE_COUNTDOWN === 'true';
 
   const now = Date.now();
   let dateStr = cachedDateStr;
 
   if (!dateStr || now - lastCheckTime > CACHE_LIFETIME) {
     try {
-      // Periksa apakah countdown dimatikan via RTDB
-      const enableRes = await fetch(`${RTDB_URL}/enablecountdown.json`, {
-        cache: 'no-store',
-      });
-      if (enableRes.ok) {
-        const enableVal = await enableRes.json();
-        if (enableVal === false || enableVal === 'false') {
-          return true;
+      // Periksa apakah countdown dimatikan via RTDB (hanya jika TIDAK dipaksa 'true' di env)
+      if (!isExplicitlyEnabled) {
+        const enableRes = await fetch(`${RTDB_URL}/enablecountdown.json`, {
+          cache: 'no-store',
+        });
+        if (enableRes.ok) {
+          const enableVal = await enableRes.json();
+          if (enableVal === false || enableVal === 'false') {
+            return true;
+          }
         }
       }
 
@@ -77,17 +81,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Cek token autentikasi di cookie
+  const token = request.cookies.get('ruang59_web_token')?.value;
+
   // Cek status rilis langsung di sisi server dari Firebase Realtime Database
   const isReleased = await checkIsServerReleased();
 
-  // PROTEKSI TOTAL SISI SERVER (ANTI INJECT URL & ANTI INSPECT BROWSER):
-  // Jika belum waktu rilis, blokir total /login, /register, dan root /
-  // Server langsung membalikkan respon HTTP 307 Redirect ke /countdown
-  // HTML form login/register sama sekali TIDAK PERNAH dikirimkan ke browser.
+  // PROTEKSI TOTAL SISI SERVER:
+  // 1. Jika countdown aktif (belum rilis):
   if (!isReleased) {
-    if (pathname === '/login' || pathname === '/register' || pathname === '/') {
+    if (!token) {
+      if (pathname === '/login' || pathname === '/register' || pathname === '/') {
+        const url = request.nextUrl.clone();
+        url.pathname = '/countdown';
+        return NextResponse.redirect(url);
+      }
+    }
+  } else {
+    // 2. Jika countdown dimatikan (sudah rilis / NEXT_PUBLIC_ENABLE_COUNTDOWN=false):
+    // Ketika user belum login membuka root /, langsung arahkan ke /login
+    if (!token && pathname === '/') {
       const url = request.nextUrl.clone();
-      url.pathname = '/countdown';
+      url.pathname = '/login';
       return NextResponse.redirect(url);
     }
   }

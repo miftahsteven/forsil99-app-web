@@ -129,6 +129,7 @@ export interface Comment {
   authorPhotoUrl?: string;
   authorClass?: string;
   authorIsVerified?: boolean;
+  authorProfileCategory?: string;
   text: string;
   createdAt: string;
   parentId?: string;
@@ -151,6 +152,7 @@ export interface Post {
   authorPhotoUrl?: string;
   authorClass?: string;
   authorIsVerified?: boolean;
+  authorProfileCategory?: string;
   type: PostType;
   text: string;
   media?: PostMedia[];

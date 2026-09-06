@@ -308,11 +308,11 @@ export function PostCard({ post, onPostDeleted }: PostCardProps) {
               >
                 {authorName}
               </Link>
-              {post.author?.profile?.profileCategory ? (
-                <ProfileCategoryBadge category={post.author.profile.profileCategory} size={15} />
-              ) : (
+              {(post.authorProfileCategory || post.author?.profile?.profileCategory) ? (
+                <ProfileCategoryBadge category={post.authorProfileCategory || post.author?.profile?.profileCategory} size={15} />
+              ) : post.authorIsVerified ? (
                 <VerifiedBadge size={14} />
-              )}
+              ) : null}
             </div>
 
             <div className="flex items-center gap-1.5 text-xs text-slate-500">

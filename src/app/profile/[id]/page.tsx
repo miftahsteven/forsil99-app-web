@@ -11,7 +11,7 @@ import { AlumniProfile, Post, Product, Shop } from '@/types';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge, GoldBadge } from '@/components/ui/VerifiedBadge';
 import { ProfileCategoryBadge } from '@/components/ui/ProfileCategoryBadge';
-import { SuperIntrovBanner } from '@/components/profile/SuperIntrovBanner';
+import { IncompleteProfileReminderBanner } from '@/components/profile/IncompleteProfileReminderBanner';
 import { PostCard } from '@/components/feed/PostCard';
 import { ProductCard } from '@/components/shop/ProductCard';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -428,10 +428,10 @@ export default function ProfileDetailPage() {
         </div>
       </div>
 
-      {/* Super Introv Profile Completion Alert */}
-      {isMe && profile.profileCategory === 'super_introv' && (
+      {/* Incomplete Profile Reminder Alert */}
+      {isMe && (!profile.isComplete || (profile.completionPercentage !== undefined && profile.completionPercentage < 100)) && (
         <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-          <SuperIntrovBanner profile={profile} />
+          <IncompleteProfileReminderBanner profile={profile} />
         </div>
       )}
 

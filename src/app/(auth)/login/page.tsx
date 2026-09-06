@@ -154,6 +154,14 @@ export default function LoginPage() {
     }
   };
 
+  if (isCountdownEnabled && !isReleased) {
+    return (
+      <div className="min-h-screen bg-[#050814] flex flex-col items-center justify-center p-4">
+        <div className="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col justify-between p-5 bg-gradient-to-b from-blue-50/50 via-white to-slate-50">
       <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center">

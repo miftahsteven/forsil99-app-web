@@ -59,7 +59,7 @@ export function ProfileCategoryBadge({
     return (
       <span
         className={`inline-flex items-center gap-1 group relative cursor-help ${className}`}
-        title="⚪ Introv: Profil Lengkap (Private Profile)"
+        title="⚪ Introv: Kategori Profil Privat / Default Pendaftar Baru (Data Belum Lengkap)"
       >
         <CheckCircle2
           size={size}

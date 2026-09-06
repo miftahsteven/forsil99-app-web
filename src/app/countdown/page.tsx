@@ -16,15 +16,7 @@ import {
   Volume2,
   VolumeX,
   Sparkles,
-  Sliders,
-  ChevronDown,
-  ChevronUp,
-  RotateCcw,
-  Zap,
-  Layers,
-  Clock,
   Radio,
-  Trash2,
 } from 'lucide-react';
 
 export default function CountdownPage() {
@@ -40,21 +32,14 @@ export default function CountdownPage() {
     resetWelcomeCache,
   } = useReleaseDate();
 
-  // State target rilis (bisa dioverride sementara saat simulasi manual 10 detik)
-  const [overrideDate, setOverrideDate] = useState<string | null>(null);
-  const effectiveDateIso = overrideDate || rtdbDateIso;
-
+  const effectiveDateIso = rtdbDateIso;
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
-  const [colorVariant, setColorVariant] = useState<'forsil-blue' | 'arc-cyan' | 'forsil-gold'>('forsil-blue');
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [showDevControls, setShowDevControls] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
 
   // Setiap kali tanggal rilis dari RTDB berubah:
   useEffect(() => {
     setMounted(true);
-    setOverrideDate(null); // Reset override jika ada perubahan dari Firebase RTDB
-
     const isPast = Date.now() >= targetDate.getTime();
     setIsCompleted(isPast);
   }, [rtdbDateIso, targetDate]);
@@ -70,36 +55,6 @@ export default function CountdownPage() {
     if (!nextMuted) {
       soundFx.playHudBeep();
     }
-  };
-
-  // Simulasi untuk testing pengembang & peninjauan
-  const handleSimulateTenSeconds = () => {
-    const tenSecsLater = new Date(Date.now() + 10000).toISOString();
-    setOverrideDate(tenSecsLater);
-    setIsCompleted(false);
-    resetWelcomeSeen();
-    soundFx.playHudBeep();
-  };
-
-  const handleSimulateInstantZero = () => {
-    setIsCompleted(true);
-    resetWelcomeSeen();
-    soundFx.playHudBeep();
-  };
-
-  const handleResetToLiveDate = () => {
-    setOverrideDate(null);
-    setIsCompleted(Date.now() >= targetDate.getTime());
-    resetWelcomeSeen();
-    resetWelcomeCache();
-    soundFx.playHudBeep();
-  };
-
-  const handleClearAllTestingCache = () => {
-    resetWelcomeSeen();
-    resetWelcomeCache();
-    setIsCompleted(false);
-    soundFx.playHudBeep();
   };
 
   if (!mounted) {
@@ -185,7 +140,7 @@ export default function CountdownPage() {
             <div className="my-2 sm:my-4 w-full">
               <FlipCountdown
                 targetDate={effectiveDateIso}
-                variant={colorVariant}
+                variant="forsil-blue"
                 onComplete={handleCountdownComplete}
               />
             </div>
@@ -204,116 +159,13 @@ export default function CountdownPage() {
       </main>
 
       {/* 4. Footer */}
-      <footer className="relative z-20 w-full px-4 py-4 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/60 bg-slate-950/40 backdrop-blur-md">
+      <footer className="relative z-20 w-full px-4 py-4 flex items-center justify-center text-[11px] text-slate-400 border-t border-slate-800/60 bg-slate-950/40 backdrop-blur-md">
         <div className="flex items-center gap-2 font-rajdhani tracking-wider uppercase">
           <span>© 2026 FORSIL 99</span>
           <span>•</span>
           <span>SMAN 59 JAKARTA</span>
         </div>
-
-        <div className="flex items-center gap-4 mt-2 sm:mt-0">
-          {/* Tombol Drawer Developer Testing */}
-          {RELEASE_CONFIG.allowDevPreview && (
-            <button
-              onClick={() => setShowDevControls(!showDevControls)}
-              className="text-sky-400/80 hover:text-sky-300 flex items-center gap-1 font-rajdhani font-semibold tracking-wider uppercase transition"
-            >
-              <Sliders size={13} />
-              <span>Kontrol Realtime & Uji ({showDevControls ? 'Tutup' : 'Buka'})</span>
-              {showDevControls ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
-            </button>
-          )}
-        </div>
       </footer>
-
-      {/* 5. Developer & Testing Simulation Drawer */}
-      {RELEASE_CONFIG.allowDevPreview && showDevControls && (
-        <div className="relative z-30 w-full bg-slate-900/95 border-t border-sky-500/30 p-4 sm:p-5 backdrop-blur-xl animate-fade-in shadow-2xl">
-          <div className="max-w-5xl mx-auto flex flex-col lg:flex-row items-center justify-between gap-4">
-            <div className="space-y-1 text-left">
-              <div className="flex items-center gap-2 text-xs font-rajdhani font-bold text-sky-400 uppercase tracking-wider">
-                <Clock size={15} />
-                <span>Panel Sinkronisasi & Uji Coba Countdown</span>
-                {source === 'rtdb' && (
-                  <span className="text-[10px] text-emerald-400 font-normal bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40">
-                    Terhubung ke Firebase Realtime Database
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Target Rilis Aktif:{' '}
-                <strong className="text-amber-300 font-mono">{effectiveDateIso}</strong> ({formattedLabel})
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Test 10s */}
-              <button
-                onClick={handleSimulateTenSeconds}
-                className="px-3 py-1.5 rounded-lg bg-sky-600/30 hover:bg-sky-600/50 border border-sky-500/40 text-xs font-rajdhani font-bold text-sky-200 tracking-wider flex items-center gap-1.5 transition active:scale-95"
-              >
-                <Zap size={14} className="text-amber-400" />
-                <span>Uji 10 Detik</span>
-              </button>
-
-              {/* Instant 00:00 */}
-              <button
-                onClick={handleSimulateInstantZero}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-xs font-rajdhani font-bold text-emerald-200 tracking-wider flex items-center gap-1.5 transition active:scale-95"
-              >
-                <Sparkles size={14} className="text-emerald-400" />
-                <span>Halaman Selamat Datang</span>
-              </button>
-
-              {/* Reset ke Tanggal Realtime Database */}
-              <button
-                onClick={handleResetToLiveDate}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-rajdhani font-bold text-slate-300 tracking-wider flex items-center gap-1.5 transition active:scale-95"
-                title="Gunakan tanggal dari Firebase RTDB / .env"
-              >
-                <RotateCcw size={14} />
-                <span>Reset ke Waktu RTDB</span>
-              </button>
-
-              {/* Bersihkan Cache Redirect */}
-              <button
-                onClick={handleClearAllTestingCache}
-                className="px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/30 text-xs font-rajdhani font-bold text-rose-300 tracking-wider flex items-center gap-1.5 transition active:scale-95"
-                title="Hapus flag welcome_seen di browser agar countdown dapat dilihat kembali"
-              >
-                <Trash2 size={13} />
-                <span>Bersihkan Cache Status</span>
-              </button>
-
-              {/* Color variant switch */}
-              <div className="flex items-center gap-1 ml-2 border-l border-slate-700 pl-2">
-                <Layers size={14} className="text-slate-400 mr-1" />
-                <button
-                  onClick={() => setColorVariant('forsil-blue')}
-                  className={`w-6 h-6 rounded-full border ${
-                    colorVariant === 'forsil-blue' ? 'border-white scale-110' : 'border-transparent'
-                  } bg-[#254B8C]`}
-                  title="Tema Forsil Navy Blue"
-                />
-                <button
-                  onClick={() => setColorVariant('arc-cyan')}
-                  className={`w-6 h-6 rounded-full border ${
-                    colorVariant === 'arc-cyan' ? 'border-white scale-110' : 'border-transparent'
-                  } bg-[#0F766E]`}
-                  title="Tema Arc Reactor Cyan"
-                />
-                <button
-                  onClick={() => setColorVariant('forsil-gold')}
-                  className={`w-6 h-6 rounded-full border ${
-                    colorVariant === 'forsil-gold' ? 'border-white scale-110' : 'border-transparent'
-                  } bg-[#845E16]`}
-                  title="Tema Forsil Gold"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

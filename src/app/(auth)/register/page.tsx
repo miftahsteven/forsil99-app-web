@@ -329,6 +329,14 @@ export default function RegisterPage() {
     }
   };
 
+  if (isCountdownEnabled && !isReleased) {
+    return (
+      <div className="min-h-screen bg-[#050814] flex flex-col items-center justify-center p-4">
+        <div className="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen py-8 px-4 bg-gradient-to-b from-blue-50/50 via-white to-slate-50">
       <div className="w-full max-w-md mx-auto">

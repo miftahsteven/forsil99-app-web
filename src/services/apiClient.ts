@@ -25,6 +25,9 @@ export function getAccessToken(): string | null {
 export function setAccessToken(token: string): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(TOKEN_KEY, token);
+  try {
+    document.cookie = `${TOKEN_KEY}=${encodeURIComponent(token)}; path=/; max-age=604800; SameSite=Lax`;
+  } catch {}
 }
 
 export function clearAccessToken(): void {
@@ -32,6 +35,9 @@ export function clearAccessToken(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(PROFILE_KEY);
+  try {
+    document.cookie = `${TOKEN_KEY}=; path=/; max-age=0; SameSite=Lax`;
+  } catch {}
 }
 
 export function getCachedUserProfile(): any | null {

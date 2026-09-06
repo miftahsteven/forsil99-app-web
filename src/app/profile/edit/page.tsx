@@ -28,6 +28,7 @@ import {
   Shield,
   ShieldCheck,
   ExternalLink,
+  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PrivacyPolicyModal } from '@/components/legal/PrivacyPolicyModal';
@@ -154,6 +155,44 @@ export default function EditProfilePage() {
     setHobbies((prev) => prev.filter((h) => h !== hobbyName));
   };
 
+  // Dynamically evaluate current completeness based on form values
+  const hasFullName = Boolean(fullName.trim());
+  const hasClassName = Boolean(className.trim());
+  const hasBirthDate = Boolean(birthDate.trim());
+  const hasWhatsapp = Boolean(whatsappNumber.trim());
+  const hasCurrentAddress = Boolean(currentAddress.trim());
+  const finalOccupation =
+    selectedProfCategory === 'Lainnya'
+      ? customOccupation.trim() || 'Lainnya'
+      : selectedProfCategory;
+  const hasOccupation = Boolean(finalOccupation.trim() && finalOccupation !== 'Lainnya');
+  const hasGender = Boolean(gender.trim());
+  const hasMaritalStatus = Boolean(maritalStatus.trim());
+  const hasHobbies = Array.isArray(hobbies) && hobbies.length > 0;
+  const hasCity = Boolean(city.trim());
+  const hasBio = Boolean(bio.trim());
+  const hasPhoto = Boolean(profilePhotoUrl.trim());
+
+  const formFieldsStatus = [
+    { name: 'Nama Lengkap', filled: hasFullName },
+    { name: 'Kelas (SMAN 59)', filled: hasClassName },
+    { name: 'Tanggal Lahir', filled: hasBirthDate },
+    { name: 'No. WhatsApp', filled: hasWhatsapp },
+    { name: 'Alamat Lengkap Saat Ini', filled: hasCurrentAddress },
+    { name: 'Pekerjaan / Profesi', filled: hasOccupation },
+    { name: 'Jenis Kelamin', filled: hasGender },
+    { name: 'Status Pernikahan', filled: hasMaritalStatus },
+    { name: 'Hobi / Minat', filled: hasHobbies },
+    { name: 'Kota Domisili', filled: hasCity },
+    { name: 'Bio / Cerita Singkat', filled: hasBio },
+    { name: 'Foto Profil', filled: hasPhoto },
+  ];
+
+  const formFilledCount = formFieldsStatus.filter((f) => f.filled).length;
+  const formMissingList = formFieldsStatus.filter((f) => !f.filled).map((f) => f.name);
+  const formPercentage = Math.round((formFilledCount / formFieldsStatus.length) * 100);
+  const isFormComplete = formFilledCount === formFieldsStatus.length;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
@@ -165,11 +204,6 @@ export default function EditProfilePage() {
       toast.error('Anda wajib mencentang persetujuan Kebijakan Privasi Forsil 99 untuk memperbarui profil.');
       return;
     }
-
-    const finalOccupation =
-      selectedProfCategory === 'Lainnya'
-        ? customOccupation.trim() || 'Lainnya'
-        : selectedProfCategory;
 
     setIsSaving(true);
     try {
@@ -188,13 +222,20 @@ export default function EditProfilePage() {
         hobbies,
         bio: bio.trim() || undefined,
         profileVisibility,
+        profileCategory: isFormComplete
+          ? (profileVisibility === 'public' ? 'super_extrov' : profileVisibility === 'followers' ? 'extrov' : 'introv')
+          : 'introv',
         tempPublicHours: tempPublicHours !== '0' ? parseInt(tempPublicHours, 10) : 0,
         profilePhotoUrl: profilePhotoUrl || undefined,
       });
 
       if (updated) {
         updateCurrentProfileState(updated);
-        toast.success('Profil berhasil diperbarui!');
+        if (updated.isComplete) {
+          toast.success('Profil berhasil diperbarui dengan data 100% lengkap!');
+        } else {
+          toast.success('Perubahan data berhasil disimpan! Status profil: Belum Lengkap (Kategori: Introv).');
+        }
         router.push(`/profile/${profile?.uid || 'me'}`);
       }
     } catch (err: any) {
@@ -221,6 +262,88 @@ export default function EditProfilePage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Status Card: Kelengkapan Data & Kategori Profil */}
+        <div
+          className={`p-5 rounded-2xl border-2 shadow-xs transition-all ${
+            isFormComplete
+              ? 'bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white border-emerald-300'
+              : 'bg-gradient-to-br from-amber-50 via-orange-50/60 to-white border-amber-300'
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wide ${
+                  isFormComplete
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-amber-600 text-white shadow-xs'
+                }`}
+              >
+                {isFormComplete ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                {isFormComplete ? 'STATUS: DATA 100% LENGKAP' : 'STATUS DATA: BELUM LENGKAP'}
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-slate-800 text-amber-200 border border-slate-700">
+                Kategori:{' '}
+                {isFormComplete
+                  ? profileVisibility === 'public'
+                    ? 'Super Extrov (👑)'
+                    : profileVisibility === 'followers'
+                    ? 'Extrov (🔷)'
+                    : 'Introv (⚪)'
+                  : 'Introv (⚪ Default Data Belum Lengkap)'}
+              </span>
+            </div>
+            <span className="text-xs font-extrabold text-slate-800 bg-white/80 px-2.5 py-1 rounded-lg border border-slate-200">
+              {formFilledCount} dari {formFieldsStatus.length} data ({formPercentage}%)
+            </span>
+          </div>
+
+          <div className="w-full h-3 bg-slate-200/70 rounded-full overflow-hidden mb-3 p-0.5">
+            <div
+              className={`h-full transition-all duration-500 rounded-full ${
+                isFormComplete
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                  : 'bg-gradient-to-r from-amber-500 to-orange-500'
+              }`}
+              style={{ width: `${Math.min(Math.max(formPercentage, 8), 100)}%` }}
+            />
+          </div>
+
+          {!isFormComplete ? (
+            <div className="space-y-2 text-xs text-slate-700 leading-relaxed">
+              <p>
+                <strong className="text-amber-950 font-bold">Pengingat Forsil 99:</strong> Seluruh pendaftar baru secara default memiliki status kategori <strong className="text-slate-900 font-extrabold">Introv</strong> karena data belum terisi lengkap.{' '}
+                <span className="bg-amber-100/80 text-amber-950 font-semibold px-1 py-0.5 rounded">
+                  Anda tetap bisa menyimpan perubahan data kapan saja meski belum lengkap.
+                </span>{' '}
+                Setelah seluruh 12 data terisi lengkap (100%), Anda bebas memilih kategori profil Super Extrov (👑), Extrov (🔷), atau tetap Introv (⚪).
+              </p>
+              {formMissingList.length > 0 && (
+                <div className="pt-1">
+                  <span className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    Sisa data yang belum diisi ({formMissingList.length} data):
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {formMissingList.map((m, idx) => (
+                      <span
+                        key={idx}
+                        className="text-[11px] font-medium bg-amber-100/90 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-lg flex items-center gap-1"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-emerald-900 leading-relaxed font-semibold">
+              🎉 Selamat! Seluruh 12 data alumni Anda sudah lengkap. Anda bebas memilih kategori profil di bawah: Super Extrov (👑 Crown Emas), Extrov (🔷 Centang Biru), atau tetap Introv (⚪).
+            </p>
+          )}
+        </div>
+
         {/* Card 1: Foto Profil */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center">
           <div className="relative group">
@@ -263,9 +386,18 @@ export default function EditProfilePage() {
                 className="mt-1 text-amber-500 focus:ring-amber-400"
               />
               <div className="flex-1">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <Crown size={16} className="fill-amber-400 text-amber-700" />
                   <span className="text-xs font-bold text-slate-900">Buka untuk Semua Alumni (Super Extrov)</span>
+                  {isFormComplete ? (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                      👑 Siap Digunakan
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      Aktif setelah 12 data lengkap
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
                   Semua rekan alumni 1999 dapat melihat profil lengkap Anda. Mendapatkan lencana 👑 Crown Emas jika seluruh data profil telah lengkap.
@@ -316,9 +448,18 @@ export default function EditProfilePage() {
                 className="mt-1 text-blue-500 focus:ring-blue-400"
               />
               <div className="flex-1">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <BadgeCheck size={16} className="fill-blue-500 text-white" />
                   <span className="text-xs font-bold text-slate-900">Khusus Pengikut Saja (Extrov)</span>
+                  {isFormComplete ? (
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                      🔷 Siap Digunakan
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      Aktif setelah 12 data lengkap
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
                   Hanya alumni yang mengikuti (followers) yang dapat melihat rincian kontak dan profil lengkap Anda. Mendapatkan lencana 🔷 Centang Biru.
@@ -346,9 +487,12 @@ export default function EditProfilePage() {
                 className="mt-1 text-slate-500 focus:ring-slate-400"
               />
               <div className="flex-1">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <CheckCircle2 size={15} className="fill-slate-400 text-white" />
                   <span className="text-xs font-bold text-slate-900">Privat / Tertutup (Introv)</span>
+                  <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                    ⚪ Default Pendaftar Baru
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
                   Menutup informasi profil dari semua alumni (hanya Anda yang dapat melihat rincian). Mendapatkan lencana ⚪ Centang Abu-abu.

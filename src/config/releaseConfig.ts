@@ -26,7 +26,7 @@ export const RELEASE_CONFIG: ReleaseConfig = {
   formattedDateText: DEFAULT_RELEASE_LABEL,
   // Jika process.env.NEXT_PUBLIC_ENABLE_COUNTDOWN bernilai 'false', countdown dinonaktifkan
   isCountdownEnabled: process.env.NEXT_PUBLIC_ENABLE_COUNTDOWN !== 'false',
-  allowDevPreview: true,
+  allowDevPreview: false,
 };
 
 export interface RemainingTime {
