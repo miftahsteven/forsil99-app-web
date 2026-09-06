@@ -143,39 +143,52 @@ export default function ProfileDetailPage() {
   const loadProfileData = async () => {
     setIsLoading(true);
     try {
-      const [prof, posts, followStatus, prods, shops] = await Promise.all([
-        fetchProfileById(targetId),
-        fetchPosts(undefined, targetId),
-        fetchFollowStatus(targetId),
-        fetchProducts(undefined, undefined, targetId),
-        fetchShops(targetId),
-      ]);
-
+      // 1. Fetch main profile immediately so UI can render in ~200ms
+      const prof = await fetchProfileById(targetId);
       if (prof) {
         setProfile(prof);
+        setIsLoading(false);
+
         if (typeof prof.isFollowing === 'boolean') {
           setIsFollowing(prof.isFollowing);
         }
-      }
-      const regularPosts = posts.filter((p) => p.type !== 'shop_share');
-      const shopPosts = posts.filter((p) => p.type === 'shop_share');
-      setUserPosts(regularPosts);
-      setSellerPosts(shopPosts);
-      setUserProducts(prods || []);
-      if (shops && shops.length > 0) {
-        setUserShop(shops[0]);
-      } else {
-        setUserShop(null);
+        if ((prof as any).followersCount !== undefined) {
+          setFollowersCount((prof as any).followersCount);
+          setFollowingCount((prof as any).followingCount);
+        }
       }
 
-      if (followStatus) {
-        setIsFollowing(followStatus.isFollowing);
-        setFollowersCount(followStatus.followersCount);
-        setFollowingCount(followStatus.followingCount);
-      }
+      // 2. Fetch posts, products, and shops concurrently in background
+      Promise.all([
+        fetchPosts(undefined, targetId),
+        fetchProducts(undefined, undefined, targetId),
+        fetchShops(targetId),
+        (!prof || (prof as any).followersCount === undefined) ? fetchFollowStatus(targetId) : Promise.resolve(null),
+      ]).then(([posts, prods, shops, followStatus]) => {
+        if (posts) {
+          const regularPosts = posts.filter((p) => p.type !== 'shop_share');
+          const shopPosts = posts.filter((p) => p.type === 'shop_share');
+          setUserPosts(regularPosts);
+          setSellerPosts(shopPosts);
+        }
+        if (prods) {
+          setUserProducts(prods || []);
+        }
+        if (shops && shops.length > 0) {
+          setUserShop(shops[0]);
+        } else {
+          setUserShop(null);
+        }
+        if (followStatus) {
+          setIsFollowing(followStatus.isFollowing);
+          setFollowersCount(followStatus.followersCount);
+          setFollowingCount(followStatus.followingCount);
+        }
+      }).catch((err) => {
+        console.warn('Background profile tab data error:', err);
+      });
     } catch {
       toast.error('Gagal memuat profil alumni.');
-    } finally {
       setIsLoading(false);
     }
   };
