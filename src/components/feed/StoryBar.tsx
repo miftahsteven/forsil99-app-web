@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, X, ChevronLeft, ChevronRight, Trash2, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { fetchStories, createStory, deleteStory } from '@/services/postService';
@@ -9,10 +9,42 @@ import { AppButton } from '@/components/ui/AppButton';
 import { toast } from 'sonner';
 import { compressImage } from '@/utils/imageCompressor';
 
+interface StoryItem {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorNickname?: string;
+  authorPhotoUrl?: string;
+  authorClass?: string;
+  authorCategory?: string;
+  isOwner: boolean;
+  mediaType: 'image' | 'video';
+  mediaUrl: string;
+  caption?: string;
+  visibility?: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+interface UserStoryGroup {
+  authorId: string;
+  authorName: string;
+  authorNickname?: string;
+  authorPhotoUrl?: string;
+  authorClass?: string;
+  authorCategory?: string;
+  isOwner: boolean;
+  latestCreatedAt: string;
+  items: StoryItem[];
+}
+
 export function StoryBar() {
   const { user, profile } = useAuth();
-  const [stories, setStories] = useState<any[]>([]);
-  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [stories, setStories] = useState<StoryItem[]>([]);
+
+  // Active Story Group & Segment state
+  const [activeGroupIndex, setActiveGroupIndex] = useState<number | null>(null);
+  const [activeItemIndex, setActiveItemIndex] = useState<number>(0);
 
   // Flow Kirim Story states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -30,22 +62,101 @@ export function StoryBar() {
 
   const loadStories = async () => {
     const data = await fetchStories();
-    setStories(data);
+    setStories(data || []);
   };
+
+  // 1. Group stories per alumni account (authorId)
+  const storyGroups: UserStoryGroup[] = useMemo(() => {
+    const map = new Map<string, UserStoryGroup>();
+
+    stories.forEach((story) => {
+      const key = story.authorId;
+      const isMyStory =
+        story.isOwner ||
+        story.authorId === user?.id ||
+        story.authorId === profile?.uid;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          authorId: story.authorId,
+          authorName: isMyStory
+            ? (profile?.fullName || story.authorName || 'Cerita Anda')
+            : (story.authorName || 'Alumni 59'),
+          authorNickname: story.authorNickname,
+          authorPhotoUrl: isMyStory
+            ? (profile?.profilePhotoUrl || story.authorPhotoUrl)
+            : story.authorPhotoUrl,
+          authorClass: isMyStory
+            ? (profile?.className || story.authorClass)
+            : story.authorClass,
+          authorCategory: isMyStory
+            ? (profile?.profileCategory || story.authorCategory)
+            : story.authorCategory,
+          isOwner: isMyStory,
+          latestCreatedAt: story.createdAt,
+          items: [],
+        });
+      }
+
+      const grp = map.get(key)!;
+      grp.items.push(story);
+      if (new Date(story.createdAt).getTime() > new Date(grp.latestCreatedAt).getTime()) {
+        grp.latestCreatedAt = story.createdAt;
+      }
+    });
+
+    // Urutkan item tiap user dari lama ke baru (kronologis seperti Instagram/WhatsApp)
+    map.forEach((grp) => {
+      grp.items.sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+    });
+
+    return Array.from(map.values());
+  }, [stories, user?.id, profile]);
+
+  // Kelompokkan cerita milik user yang sedang login
+  const myGroup = useMemo(() => {
+    return (
+      storyGroups.find(
+        (g) => g.isOwner || g.authorId === user?.id || g.authorId === profile?.uid
+      ) || null
+    );
+  }, [storyGroups, user?.id, profile]);
+
+  // Kelompokkan cerita milik alumni lain (diurutkan dari yang terbaru posting)
+  const otherGroups = useMemo(() => {
+    return storyGroups
+      .filter(
+        (g) => !g.isOwner && g.authorId !== user?.id && g.authorId !== profile?.uid
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime()
+      );
+  }, [storyGroups, user?.id, profile]);
+
+  // Seluruh grup gabungan untuk navigasi viewer (Saya di awal jika ada, lalu alumni lain)
+  const allDisplayGroups = useMemo(() => {
+    const list: UserStoryGroup[] = [];
+    if (myGroup) list.push(myGroup);
+    list.push(...otherGroups);
+    return list;
+  }, [myGroup, otherGroups]);
+
+  const hasMyActiveStory = Boolean(myGroup && myGroup.items.length > 0);
 
   // Step 1: User selects image
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Pastikan media hanya gambar
     if (!file.type.startsWith('image/')) {
       toast.error('Sementara baru bisa kirim story gambar/foto.');
       e.target.value = '';
       return;
     }
 
-    // Baca data gambar untuk pratinjau sebelum dikirim
     const reader = new FileReader();
     reader.onload = () => {
       setSelectedImageBase64(reader.result as string);
@@ -65,7 +176,6 @@ export function StoryBar() {
 
     setIsUploading(true);
     try {
-      // Kompresi gambar optimal
       const compressed = await compressImage(selectedImageBase64, {
         imageCount: 1,
         maxDimension: 1200,
@@ -90,7 +200,6 @@ export function StoryBar() {
     }
   };
 
-  // User cancels creating story
   const handleCancelCreate = () => {
     setIsCreateModalOpen(false);
     setSelectedImageBase64(null);
@@ -105,8 +214,19 @@ export function StoryBar() {
     try {
       await deleteStory(storyId);
       toast.success('Cerita berhasil dihapus.');
-      setActiveStoryIndex(null);
       setConfirmDeleteId(null);
+
+      // Jika grup ini hanya punya 1 cerita, tutup viewer
+      if (
+        activeGroupIndex !== null &&
+        allDisplayGroups[activeGroupIndex]?.items.length <= 1
+      ) {
+        setActiveGroupIndex(null);
+        setActiveItemIndex(0);
+      } else if (activeItemIndex > 0) {
+        setActiveItemIndex(activeItemIndex - 1);
+      }
+
       await loadStories();
     } catch (err: any) {
       toast.error(err.message || 'Gagal menghapus cerita.');
@@ -125,19 +245,69 @@ export function StoryBar() {
     return 'Hari ini';
   };
 
-  const myStoryIndex = stories.findIndex(
-    (s) => s.isOwner || s.authorId === user?.id || s.authorId === profile?.uid
-  );
-  const hasMyActiveStory = myStoryIndex !== -1;
-  const followedStories = stories.filter(
-    (s) => !s.isOwner && s.authorId !== user?.id && s.authorId !== profile?.uid
-  );
+  // Navigation handlers for Story Viewer
+  const handleViewerPrev = useCallback(() => {
+    setConfirmDeleteId(null);
+    if (activeGroupIndex === null) return;
+    const currentGroup = allDisplayGroups[activeGroupIndex];
+    if (!currentGroup) return;
+
+    if (activeItemIndex > 0) {
+      // Pindah ke slide sebelumnya pada author yang sama
+      setActiveItemIndex((prev) => prev - 1);
+    } else if (activeGroupIndex > 0) {
+      // Pindah ke author sebelumnya (slide terakhirnya)
+      const prevGroup = allDisplayGroups[activeGroupIndex - 1];
+      setActiveGroupIndex(activeGroupIndex - 1);
+      setActiveItemIndex(Math.max(0, prevGroup.items.length - 1));
+    }
+  }, [activeGroupIndex, activeItemIndex, allDisplayGroups]);
+
+  const handleViewerNext = useCallback(() => {
+    setConfirmDeleteId(null);
+    if (activeGroupIndex === null) return;
+    const currentGroup = allDisplayGroups[activeGroupIndex];
+    if (!currentGroup) return;
+
+    if (activeItemIndex < currentGroup.items.length - 1) {
+      // Pindah ke slide selanjutnya pada author yang sama
+      setActiveItemIndex((prev) => prev + 1);
+    } else if (activeGroupIndex < allDisplayGroups.length - 1) {
+      // Pindah ke author berikutnya (slide pertama)
+      setActiveGroupIndex(activeGroupIndex + 1);
+      setActiveItemIndex(0);
+    } else {
+      // Selesai seluruh cerita, tutup viewer
+      setActiveGroupIndex(null);
+      setActiveItemIndex(0);
+    }
+  }, [activeGroupIndex, activeItemIndex, allDisplayGroups]);
+
+  // Keyboard navigation (ArrowLeft, ArrowRight, Escape)
+  useEffect(() => {
+    if (activeGroupIndex === null) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        handleViewerPrev();
+      } else if (e.key === 'ArrowRight') {
+        handleViewerNext();
+      } else if (e.key === 'Escape') {
+        setActiveGroupIndex(null);
+        setActiveItemIndex(0);
+        setConfirmDeleteId(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeGroupIndex, handleViewerPrev, handleViewerNext]);
 
   return (
     <>
       <div id="home-story-bar" className="bg-white px-3 py-3 border-b border-slate-100 shadow-subtle mb-3">
         <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
-          {/* Add / View My Story Button */}
+          {/* 1. Add / View My Story Button (Grouped in 1 circle) */}
           <div className="flex flex-col items-center flex-shrink-0 cursor-pointer group">
             <div className="relative">
               <input
@@ -152,7 +322,11 @@ export function StoryBar() {
               <div
                 onClick={() => {
                   if (hasMyActiveStory) {
-                    setActiveStoryIndex(myStoryIndex);
+                    const myIdx = allDisplayGroups.findIndex(
+                      (g) => g.authorId === myGroup?.authorId
+                    );
+                    setActiveGroupIndex(myIdx !== -1 ? myIdx : 0);
+                    setActiveItemIndex(0);
                   } else {
                     document.getElementById('my-story-file-input')?.click();
                   }
@@ -166,12 +340,22 @@ export function StoryBar() {
                   hasStory={hasMyActiveStory}
                   className="group-hover:opacity-90 transition-opacity"
                 />
+
+                {/* Badge jumlah story saya jika lebih dari 1 */}
+                {myGroup && myGroup.items.length > 1 && (
+                  <span
+                    className="absolute -top-1 -left-1 bg-amber-500 text-white text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border-2 border-white shadow-xs z-10"
+                    title={`${myGroup.items.length} cerita Anda`}
+                  >
+                    {myGroup.items.length}
+                  </span>
+                )}
               </div>
 
               {/* Plus icon to upload new story */}
               <label
                 htmlFor="my-story-file-input"
-                className="absolute -bottom-1 -right-1 w-5 h-5 bg-brand-primary text-white rounded-full border-2 border-white flex items-center justify-center shadow cursor-pointer hover:scale-110 active:scale-95 transition-transform"
+                className="absolute -bottom-1 -right-1 w-5 h-5 bg-brand-primary text-white rounded-full border-2 border-white flex items-center justify-center shadow cursor-pointer hover:scale-110 active:scale-95 transition-transform z-10"
                 title="Tambah Cerita"
               >
                 <Plus size={12} strokeWidth={3} />
@@ -183,23 +367,43 @@ export function StoryBar() {
             </span>
           </div>
 
-          {/* Other Alumni Stories List */}
-          {followedStories.map((story) => {
-            const actualIndex = stories.findIndex((s) => s.id === story.id);
-            const displayName = story.authorNickname || story.authorName?.split(' ')[0] || 'Alumni';
+          {/* 2. Other Alumni Stories List — Disatukan per Akun (1 Akun = 1 Lingkaran) */}
+          {otherGroups.map((group) => {
+            const actualGroupIndex = allDisplayGroups.findIndex(
+              (g) => g.authorId === group.authorId
+            );
+            const displayName =
+              group.authorNickname || group.authorName?.split(' ')[0] || 'Alumni';
 
             return (
               <div
-                key={story.id}
-                onClick={() => setActiveStoryIndex(actualIndex !== -1 ? actualIndex : 0)}
-                className="flex flex-col items-center flex-shrink-0 cursor-pointer active:scale-95 transition-transform"
+                key={group.authorId}
+                onClick={() => {
+                  setActiveGroupIndex(actualGroupIndex !== -1 ? actualGroupIndex : 0);
+                  setActiveItemIndex(0);
+                }}
+                className="flex flex-col items-center flex-shrink-0 cursor-pointer active:scale-95 transition-transform group"
               >
-                <AppAvatar
-                  src={story.authorPhotoUrl || story.author?.profile?.profilePhotoUrl}
-                  name={story.authorName || 'Alumni'}
-                  size="md"
-                  hasStory={true}
-                />
+                <div className="relative">
+                  <AppAvatar
+                    src={group.authorPhotoUrl}
+                    name={group.authorName || 'Alumni'}
+                    size="md"
+                    hasStory={true}
+                    className="group-hover:opacity-90 transition-opacity"
+                  />
+
+                  {/* Badge indikator jika alumni ini memiliki lebih dari 1 cerita */}
+                  {group.items.length > 1 && (
+                    <span
+                      className="absolute -top-1 -right-1 bg-brand-primary text-white text-[9.5px] font-bold px-1.5 py-0.2 rounded-full border-2 border-white shadow-xs z-10"
+                      title={`${group.items.length} cerita aktif`}
+                    >
+                      {group.items.length}
+                    </span>
+                  )}
+                </div>
+
                 <span className="text-[11px] font-medium text-slate-700 mt-1.5 truncate max-w-[68px]">
                   {displayName}
                 </span>
@@ -315,40 +519,50 @@ export function StoryBar() {
         </div>
       )}
 
-      {/* MODAL 2: Story Viewer Modal (Melihat isi cerita) */}
-      {activeStoryIndex !== null && stories[activeStoryIndex] && (() => {
-        const currentStory = stories[activeStoryIndex];
-        const isOwner =
-          currentStory.isOwner ||
-          currentStory.authorId === user?.id ||
-          currentStory.authorId === profile?.uid;
+      {/* MODAL 2: Story Viewer Modal (Grouped Playback dengan Segment Progress Bar) */}
+      {activeGroupIndex !== null && allDisplayGroups[activeGroupIndex] && (() => {
+        const currentGroup = allDisplayGroups[activeGroupIndex];
+        const currentItem =
+          currentGroup.items[activeItemIndex] || currentGroup.items[0];
+        if (!currentItem) return null;
 
-        // Ambil nama lengkap pemilik story yang tepat
-        const authorName =
-          currentStory.authorName ||
-          currentStory.author?.profile?.fullName ||
-          (isOwner ? profile?.fullName || 'Cerita Anda' : 'Alumni 59');
+        const isOwner = currentGroup.isOwner;
+        const authorName = currentGroup.authorName;
+        const authorClass = currentGroup.authorClass;
+        const authorPhoto = currentGroup.authorPhotoUrl;
+        const authorCategory = currentGroup.authorCategory;
 
-        const authorClass =
-          currentStory.authorClass ||
-          currentStory.author?.profile?.className ||
-          (isOwner ? profile?.className || 'Alumni SMAN 59' : 'Alumni SMAN 59');
-
-        const authorPhoto =
-          currentStory.authorPhotoUrl ||
-          currentStory.author?.profile?.profilePhotoUrl ||
-          (isOwner ? profile?.profilePhotoUrl : undefined);
-
-        const authorCategory =
-          currentStory.authorCategory ||
-          currentStory.author?.profile?.profileCategory ||
-          (isOwner ? profile?.profileCategory : 'introv');
+        const hasPrev =
+          activeItemIndex > 0 || activeGroupIndex > 0;
+        const hasNext =
+          activeItemIndex < currentGroup.items.length - 1 ||
+          activeGroupIndex < allDisplayGroups.length - 1;
 
         return (
           <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-2 sm:p-4 backdrop-blur-sm animate-fade-in">
-            <div className="relative w-full max-w-sm h-[84vh] max-h-[660px] bg-slate-900 rounded-2xl overflow-hidden flex flex-col justify-between shadow-2xl">
-              {/* Header Info: Nama pemilik story jelas dan tegas */}
-              <div className="absolute top-0 left-0 right-0 p-3.5 bg-gradient-to-b from-black/85 via-black/50 to-transparent z-10 flex items-center justify-between text-white">
+            <div className="relative w-full max-w-sm h-[84vh] max-h-[660px] bg-slate-900 rounded-2xl overflow-hidden flex flex-col justify-between shadow-2xl select-none">
+              {/* Segment Progress Bars di bagian atas (seperti Instagram Stories) */}
+              <div className="absolute top-2 left-2 right-2 z-30 flex items-center gap-1.5 px-1">
+                {currentGroup.items.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="h-1 flex-1 rounded-full overflow-hidden bg-white/30 backdrop-blur-xs"
+                  >
+                    <div
+                      className={`h-full transition-all duration-200 ${
+                        idx < activeItemIndex
+                          ? 'w-full bg-white'
+                          : idx === activeItemIndex
+                          ? 'w-full bg-white shadow-xs'
+                          : 'w-0 bg-transparent'
+                      }`}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Header Info: Identitas Pemilik Story */}
+              <div className="absolute top-0 left-0 right-0 pt-4 pb-3.5 px-3.5 bg-gradient-to-b from-black/85 via-black/50 to-transparent z-20 flex items-center justify-between text-white">
                 <div className="flex items-center gap-2.5 min-w-0 pr-2">
                   <AppAvatar
                     src={authorPhoto}
@@ -366,6 +580,11 @@ export function StoryBar() {
                           Anda
                         </span>
                       )}
+                      {currentGroup.items.length > 1 && (
+                        <span className="text-[9px] text-white/80 font-medium bg-white/20 px-1 rounded">
+                          {activeItemIndex + 1}/{currentGroup.items.length}
+                        </span>
+                      )}
                       {authorCategory === 'super_extrov' && (
                         <span className="text-[10px]" title="Super Extrov (Terbuka untuk Semua)">
                           👑
@@ -378,7 +597,7 @@ export function StoryBar() {
                       )}
                     </div>
                     <p className="text-[10px] text-slate-300 truncate mt-0.5">
-                      {authorClass} • {formatTimeAgo(currentStory.createdAt)}
+                      {authorClass} • {formatTimeAgo(currentItem.createdAt)}
                     </p>
                   </div>
                 </div>
@@ -388,9 +607,9 @@ export function StoryBar() {
                   {isOwner && (
                     <button
                       type="button"
-                      onClick={() => setConfirmDeleteId(currentStory.id)}
+                      onClick={() => setConfirmDeleteId(currentItem.id)}
                       className="p-1.5 rounded-full bg-black/40 text-rose-300 hover:text-white hover:bg-rose-600/80 transition-colors"
-                      title="Hapus Cerita Saya"
+                      title="Hapus Cerita Ini"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -399,7 +618,8 @@ export function StoryBar() {
                   <button
                     type="button"
                     onClick={() => {
-                      setActiveStoryIndex(null);
+                      setActiveGroupIndex(null);
+                      setActiveItemIndex(0);
                       setConfirmDeleteId(null);
                     }}
                     className="p-1.5 rounded-full bg-black/40 text-white/90 hover:bg-black/60 transition-colors"
@@ -410,11 +630,11 @@ export function StoryBar() {
                 </div>
               </div>
 
-              {/* Media Content */}
+              {/* Area Media Konten */}
               <div className="flex-1 flex items-center justify-center bg-black overflow-hidden relative">
-                {currentStory.mediaType === 'video' ? (
+                {currentItem.mediaType === 'video' ? (
                   <video
-                    src={currentStory.mediaUrl}
+                    src={currentItem.mediaUrl}
                     autoPlay
                     playsInline
                     controls
@@ -422,44 +642,62 @@ export function StoryBar() {
                   />
                 ) : (
                   <img
-                    src={currentStory.mediaUrl}
+                    src={currentItem.mediaUrl}
                     alt={authorName}
                     className="max-h-full max-w-full object-contain select-none"
                   />
                 )}
+
+                {/* Invisible tap zones: Tap kiri untuk Prev, tap kanan untuk Next (Standar Story UX) */}
+                <div
+                  className="absolute top-16 bottom-20 left-0 w-1/3 z-10 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewerPrev();
+                  }}
+                  title="Cerita Sebelumnya"
+                />
+                <div
+                  className="absolute top-16 bottom-20 right-0 w-2/3 z-10 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewerNext();
+                  }}
+                  title="Cerita Selanjutnya"
+                />
               </div>
 
               {/* Caption */}
-              {currentStory.caption && (
-                <div className="p-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent text-white text-xs leading-relaxed text-center z-10">
-                  <p className="bg-black/45 backdrop-blur-md px-3.5 py-1.5 rounded-xl inline-block border border-white/10 max-w-[92%] shadow-sm">
-                    {currentStory.caption}
+              {currentItem.caption && (
+                <div className="p-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent text-white text-xs leading-relaxed text-center z-20">
+                  <p className="bg-black/50 backdrop-blur-md px-3.5 py-1.5 rounded-xl inline-block border border-white/10 max-w-[92%] shadow-sm">
+                    {currentItem.caption}
                   </p>
                 </div>
               )}
 
-              {/* Navigation Arrows */}
-              {activeStoryIndex > 0 && (
+              {/* Navigation Arrows (Tombol navigasi samping) */}
+              {hasPrev && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setActiveStoryIndex(activeStoryIndex - 1);
-                    setConfirmDeleteId(null);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewerPrev();
                   }}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors z-20"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/75 transition-colors z-30 shadow-md"
                   title="Cerita Sebelumnya"
                 >
                   <ChevronLeft size={20} />
                 </button>
               )}
-              {activeStoryIndex < stories.length - 1 && (
+              {hasNext && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setActiveStoryIndex(activeStoryIndex + 1);
-                    setConfirmDeleteId(null);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewerNext();
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/40 text-white rounded-full hover:bg-black/60 transition-colors z-20"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/75 transition-colors z-30 shadow-md"
                   title="Cerita Selanjutnya"
                 >
                   <ChevronRight size={20} />
@@ -467,8 +705,8 @@ export function StoryBar() {
               )}
 
               {/* Confirmation Popup Hapus Story */}
-              {confirmDeleteId === currentStory.id && (
-                <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              {confirmDeleteId === currentItem.id && (
+                <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
                   <div className="bg-white rounded-2xl p-5 text-center max-w-[270px] space-y-3 shadow-2xl animate-scale-in">
                     <div className="w-11 h-11 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
                       <Trash2 size={20} />
@@ -476,7 +714,7 @@ export function StoryBar() {
                     <div>
                       <h3 className="text-sm font-bold text-slate-900">Hapus Cerita Ini?</h3>
                       <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                        Cerita akan langsung dihapus dan tidak dapat dilihat lagi oleh kawan alumni.
+                        Cerita ini akan dihapus permanen dan tidak dapat dilihat lagi oleh kawan alumni.
                       </p>
                     </div>
                     <div className="flex gap-2 pt-1">
@@ -490,7 +728,7 @@ export function StoryBar() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleDeleteStory(currentStory.id)}
+                        onClick={() => handleDeleteStory(currentItem.id)}
                         disabled={isDeleting}
                         className="flex-1 py-2 text-xs font-bold bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-colors shadow-sm"
                       >
