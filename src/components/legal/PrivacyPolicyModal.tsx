@@ -215,7 +215,7 @@ export function PrivacyPolicyModal({ isOpen, onClose, onAccept }: PrivacyPolicyM
             <ul className="list-disc pl-5 space-y-1 text-slate-600 text-[11px]">
               <li>Mengakses dan memperbarui data pribadi kapan saja melalui menu Edit Profil.</li>
               <li>Mengubah preferensi keterbukaan data (Super Extrov / Extrov / Introv) kapan saja secara mandiri.</li>
-              <li>Menghubungi pengurus komunitas melalui email resmi <strong className="text-brand-primary">no-reply@forsil99.us</strong> untuk konsultasi keamanan atau permintaan penghapusan akun.</li>
+              <li>Menghubungi pengurus komunitas melalui email resmi <strong className="text-brand-primary">admin@forsil99.us</strong> untuk konsultasi keamanan atau permintaan penghapusan akun.</li>
             </ul>
           </div>
         </div>

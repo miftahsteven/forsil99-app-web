@@ -244,11 +244,11 @@ export default function PrivacyPolicyPage() {
             Tim Pengelola Forsil 99 siap membantu perlindungan akun dan privasi Anda. Hubungi kami melalui saluran resmi:
           </p>
           <a
-            href="mailto:no-reply@forsil99.us"
+            href="mailto:admin@forsil99.us"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-slate-200 text-brand-primary font-bold text-xs hover:bg-slate-100 shadow-xs transition-colors"
           >
             <Mail size={14} />
-            <span>no-reply@forsil99.us</span>
+            <span>admin@forsil99.us</span>
           </a>
         </div>
       </div>

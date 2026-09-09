@@ -920,7 +920,7 @@ export default function ProfileDetailPage() {
                   </div>
                   <div className="flex items-center gap-1.5 font-mono text-[11px] bg-white/10 px-2.5 py-1 rounded-lg border border-white/15 text-slate-200">
                     <span>NIA:</span>
-                    <strong className="text-white font-black">{profile.nia || '59990001'}</strong>
+                    <strong className="text-white font-black">{profile.nia || '-'}</strong>
                   </div>
                 </div>
 
@@ -1092,7 +1092,7 @@ export default function ProfileDetailPage() {
                     <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
                       <span className="text-slate-400 text-[11px] block">Nomor Induk Alumni (NIA)</span>
                       <span className="font-mono font-bold text-brand-primary text-xs block mt-0.5">
-                        {profile.nia || '59990001'}
+                        {profile.nia || '-'}
                       </span>
                     </div>
 
