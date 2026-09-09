@@ -19,6 +19,8 @@ export function normalizeProfile(profile: any): AlumniProfile | null {
     uid: userIdentifier,
     accountId: userIdentifier,
     userId: userIdentifier,
+    hideBirthDate: Boolean(profile.hideBirthDate ?? profile.privacy?.hideBirthDate),
+    hideMaritalStatus: Boolean(profile.hideMaritalStatus ?? profile.privacy?.hideMaritalStatus),
     isFollowing: typeof profile.isFollowing === 'boolean' ? profile.isFollowing : undefined,
   };
 }
@@ -304,6 +306,9 @@ export async function updateProfile(payload: {
   tempPublicHours?: number;
   profilePhotoUrl?: string;
   coverPhotoUrl?: string;
+  hideBirthDate?: boolean;
+  hideMaritalStatus?: boolean;
+  privacy?: any;
 }): Promise<AlumniProfile | null> {
   const res = await apiClient.put('/profiles/me', payload);
   if (res && res.profile) {

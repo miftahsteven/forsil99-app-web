@@ -58,7 +58,11 @@ export interface AlumniProfile {
     birthDate?: ProfileVisibility;
     occupation?: ProfileVisibility;
     lastSeen?: ProfileVisibility;
+    hideBirthDate?: boolean;
+    hideMaritalStatus?: boolean;
   };
+  hideBirthDate?: boolean;
+  hideMaritalStatus?: boolean;
   whatsappNumber?: string;
   currentAddress?: string;
   gender?: 'Pria' | 'Wanita' | string;

@@ -43,6 +43,7 @@ import {
   Sparkles,
   Shield,
   Cake,
+  EyeOff,
   Home,
   User,
   ExternalLink,
@@ -572,9 +573,14 @@ export default function ProfileDetailPage() {
               {profile.gender}
             </span>
           )}
-          {profile.maritalStatus && (
-            <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-              {profile.maritalStatus}
+          {profile.maritalStatus && (!profile.hideMaritalStatus || isMe) && (
+            <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+              <span>{profile.maritalStatus}</span>
+              {profile.hideMaritalStatus && isMe && (
+                <span className="text-[9px] text-amber-700 bg-amber-100 px-1 py-0.2 rounded font-semibold flex items-center gap-0.5">
+                  <EyeOff size={9} /> Disembunyikan
+                </span>
+              )}
             </span>
           )}
           {profile.nia && (
@@ -1098,12 +1104,29 @@ export default function ProfileDetailPage() {
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                      <span className="text-slate-400 text-[11px] block">Tanggal Lahir</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[11px] block">Tanggal Lahir</span>
+                        {profile.hideBirthDate && isMe && (
+                          <span className="text-[9px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-0.5">
+                            <EyeOff size={9} /> Disembunyikan
+                          </span>
+                        )}
+                      </div>
                       <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5 mt-0.5">
                         <Cake size={13} className="text-amber-500 flex-shrink-0" />
-                        <span>{formatBirthDate(profile.birthDate) || 'Belum diisi'}</span>
-                        {calculateAge(profile.birthDate) && (
-                          <span className="text-slate-400 font-normal">{calculateAge(profile.birthDate)}</span>
+                        {profile.birthDate ? (
+                          <>
+                            <span>{formatBirthDate(profile.birthDate) || 'Belum diisi'}</span>
+                            {calculateAge(profile.birthDate) && (
+                              <span className="text-slate-400 font-normal">{calculateAge(profile.birthDate)}</span>
+                            )}
+                          </>
+                        ) : profile.hideBirthDate ? (
+                          <span className="text-slate-400 font-normal italic flex items-center gap-1">
+                            <EyeOff size={11} className="text-slate-400 flex-shrink-0" /> Disembunyikan oleh pemilik akun
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">Belum diisi</span>
                         )}
                       </span>
                     </div>
@@ -1116,10 +1139,25 @@ export default function ProfileDetailPage() {
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 sm:col-span-2">
-                      <span className="text-slate-400 text-[11px] block">Status Pernikahan</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[11px] block">Status Pernikahan</span>
+                        {profile.hideMaritalStatus && isMe && (
+                          <span className="text-[9px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-0.5">
+                            <EyeOff size={9} /> Disembunyikan
+                          </span>
+                        )}
+                      </div>
                       <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5 mt-0.5">
                         <Heart size={13} className="text-rose-500 flex-shrink-0" />
-                        <span>{profile.maritalStatus || 'Belum diisi'}</span>
+                        {profile.maritalStatus ? (
+                          <span>{profile.maritalStatus}</span>
+                        ) : profile.hideMaritalStatus ? (
+                          <span className="text-slate-400 font-normal italic flex items-center gap-1">
+                            <EyeOff size={11} className="text-slate-400 flex-shrink-0" /> Disembunyikan oleh pemilik akun
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-normal">Belum diisi</span>
+                        )}
                       </span>
                     </div>
                   </div>

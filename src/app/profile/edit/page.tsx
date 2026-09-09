@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   ExternalLink,
   AlertCircle,
+  EyeOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PrivacyPolicyModal } from '@/components/legal/PrivacyPolicyModal';
@@ -83,6 +84,12 @@ export default function EditProfilePage() {
   const [gender, setGender] = useState<string>(profile?.gender || 'Pria');
   const [maritalStatus, setMaritalStatus] = useState<string>(profile?.maritalStatus || 'Menikah');
   const [birthDate, setBirthDate] = useState<string>(profile?.birthDate || '');
+  const [hideBirthDate, setHideBirthDate] = useState<boolean>(
+    Boolean(profile?.hideBirthDate ?? profile?.privacy?.hideBirthDate ?? false)
+  );
+  const [hideMaritalStatus, setHideMaritalStatus] = useState<boolean>(
+    Boolean(profile?.hideMaritalStatus ?? profile?.privacy?.hideMaritalStatus ?? false)
+  );
   const [bio, setBio] = useState<string>(profile?.bio || '');
 
   // Contact & Location
@@ -174,6 +181,16 @@ export default function EditProfilePage() {
       } else if (profile.city) {
         const inf = inferProvince(profile.city);
         if (inf) setProvince(inf);
+      }
+      if (profile.hideBirthDate !== undefined) {
+        setHideBirthDate(Boolean(profile.hideBirthDate));
+      } else if (profile.privacy?.hideBirthDate !== undefined) {
+        setHideBirthDate(Boolean(profile.privacy.hideBirthDate));
+      }
+      if (profile.hideMaritalStatus !== undefined) {
+        setHideMaritalStatus(Boolean(profile.hideMaritalStatus));
+      } else if (profile.privacy?.hideMaritalStatus !== undefined) {
+        setHideMaritalStatus(Boolean(profile.privacy.hideMaritalStatus));
       }
     }
   }, [profile]);
@@ -348,6 +365,13 @@ export default function EditProfilePage() {
         gender,
         maritalStatus,
         birthDate: birthDate || undefined,
+        hideBirthDate,
+        hideMaritalStatus,
+        privacy: {
+          ...(profile?.privacy || {}),
+          hideBirthDate,
+          hideMaritalStatus,
+        },
         whatsappNumber: whatsappNumber.trim() || undefined,
         city: city.trim() || undefined,
         province: province.trim() || undefined,
@@ -734,21 +758,48 @@ export default function EditProfilePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Tanggal Lahir
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Tanggal Lahir
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-medium text-slate-500 hover:text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={hideBirthDate}
+                    onChange={(e) => setHideBirthDate(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-brand-primary focus:ring-brand-primary border-slate-300"
+                  />
+                  <span>Sembunyikan</span>
+                </label>
+              </div>
               <input
                 type="date"
                 value={birthDate}
                 onChange={(e) => setBirthDate(e.target.value)}
                 className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-brand-primary focus:outline-none"
               />
+              {hideBirthDate && (
+                <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1 font-medium">
+                  <EyeOff size={11} className="flex-shrink-0" /> Disembunyikan dari profil publik
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Status Pernikahan
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Status Pernikahan
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[11px] font-medium text-slate-500 hover:text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={hideMaritalStatus}
+                    onChange={(e) => setHideMaritalStatus(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-brand-primary focus:ring-brand-primary border-slate-300"
+                  />
+                  <span>Sembunyikan</span>
+                </label>
+              </div>
               <select
                 value={maritalStatus}
                 onChange={(e) => setMaritalStatus(e.target.value)}
@@ -759,6 +810,11 @@ export default function EditProfilePage() {
                 <option value="Duda">Duda</option>
                 <option value="Janda">Janda</option>
               </select>
+              {hideMaritalStatus && (
+                <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1 font-medium">
+                  <EyeOff size={11} className="flex-shrink-0" /> Disembunyikan dari profil publik
+                </p>
+              )}
             </div>
           </div>
         </div>
