@@ -8,14 +8,15 @@ import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
 import { executeRecaptchaV3, loadRecaptchaV3Script } from '@/utils/recaptcha';
 import { Lock, Smartphone, Eye, EyeOff, Sparkles, ShieldCheck, Timer, ChevronRight } from 'lucide-react';
-import { toast } from 'sonner';
 import { useReleaseDate } from '@/hooks/useReleaseDate';
 import { WalkthroughTrigger } from '@/components/walkthrough/WalkthroughTrigger';
 import { LOGIN_WALKTHROUGH } from '@/config/walkthroughData';
+import { getAccessToken } from '@/services/apiClient';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isReleased, isCountdownEnabled, isLoading: releaseLoading } = useReleaseDate();
 
   const [identifier, setIdentifier] = useState<string>('');
@@ -104,12 +105,30 @@ export default function LoginPage() {
     return () => clearInterval(interval);
   }, [lockoutSeconds]);
 
-  // Guard: Jika belum rilis dan countdown aktif, langsung lempar ke /countdown
+  // Guard 1: Jika belum rilis dan countdown aktif, langsung lempar ke /countdown
   useEffect(() => {
     if (!releaseLoading && isCountdownEnabled && !isReleased) {
       router.replace('/countdown');
     }
   }, [isReleased, isCountdownEnabled, releaseLoading, router]);
+
+  // Guard 2: Jika user SUDAH login, jangan biarkan mengakses halaman login lagi (redirect langsung ke /)
+  useEffect(() => {
+    if (!authLoading && (isAuthenticated || Boolean(getAccessToken()))) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  // Guard 3: Tangani Back/Forward cache browser (bfcache) jika user menekan Back button dari halaman utama
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted || Boolean(getAccessToken())) {
+        router.replace('/');
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [router]);
 
   // Preload reCAPTCHA v3 script
   useEffect(() => {
@@ -140,7 +159,8 @@ export default function LoginPage() {
       if (res.success) {
         sessionStorage.removeItem('ruang59_login_lockout_until');
         toast.success(`Selamat datang kembali, ${res.profile?.fullName || 'Alumni'}!`);
-        router.push('/');
+        // Gunakan replace agar halaman /login digantikan di history browser (klik back tidak kembali ke login)
+        router.replace('/');
       }
     } catch (err: any) {
       if (err.isLocked || err.data?.isLocked || err.status === 429) {
@@ -156,10 +176,10 @@ export default function LoginPage() {
     }
   };
 
-  if (isCountdownEnabled && !isReleased) {
+  if ((isCountdownEnabled && !isReleased) || authLoading || isAuthenticated || Boolean(getAccessToken())) {
     return (
-      <div className="min-h-screen bg-[#050814] flex flex-col items-center justify-center p-4">
-        <div className="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }

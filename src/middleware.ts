@@ -84,6 +84,14 @@ export async function middleware(request: NextRequest) {
   // Cek token autentikasi di cookie
   const token = request.cookies.get('ruang59_web_token')?.value;
 
+  // JIKA USER SUDAH LOGIN:
+  // Lindungi user agar tidak masuk ke halaman /login atau /register (misal saat klik back button browser)
+  if (token && (pathname === '/login' || pathname === '/register')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    return NextResponse.redirect(url);
+  }
+
   // Cek status rilis langsung di sisi server dari Firebase Realtime Database
   const isReleased = await checkIsServerReleased();
 

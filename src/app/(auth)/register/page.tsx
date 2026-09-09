@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
 import { fetchAlumniList, registerAlumniUser } from '@/services/authService';
+import { getAccessToken } from '@/services/apiClient';
 import { executeRecaptchaV3, loadRecaptchaV3Script } from '@/utils/recaptcha';
 import {
   User,
@@ -48,15 +49,33 @@ const CLASSES = [
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isReleased, isCountdownEnabled, isLoading: releaseLoading } = useReleaseDate();
 
-  // Guard: Jika belum rilis dan countdown aktif, blokir akses register dan alihkan ke /countdown
+  // Guard 1: Jika belum rilis dan countdown aktif, blokir akses register dan alihkan ke /countdown
   useEffect(() => {
     if (!releaseLoading && isCountdownEnabled && !isReleased) {
       router.replace('/countdown');
     }
   }, [isReleased, isCountdownEnabled, releaseLoading, router]);
+
+  // Guard 2: Jika user SUDAH login, jangan biarkan mengakses halaman register (redirect langsung ke /)
+  useEffect(() => {
+    if (!authLoading && (isAuthenticated || Boolean(getAccessToken()))) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  // Guard 3: Tangani Back/Forward cache browser (bfcache) jika user menekan Back button dari halaman utama
+  useEffect(() => {
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (e.persisted || Boolean(getAccessToken())) {
+        router.replace('/');
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, [router]);
 
   const [fullName, setFullName] = useState<string>('');
   const [nickname, setNickname] = useState<string>('');
@@ -327,7 +346,7 @@ export default function RegisterPage() {
 
       sessionStorage.removeItem('ruang59_otp_cooldown_until');
       toast.success('Pendaftaran alumni terkirim & email tervalidasi! Menunggu konfirmasi referral via email.');
-      router.push('/awaiting-approval');
+      router.replace('/awaiting-approval');
     } catch (err: any) {
       toast.error(err.message || 'Verifikasi OTP gagal. Silakan periksa kembali kode OTP Anda.');
     } finally {
@@ -335,10 +354,15 @@ export default function RegisterPage() {
     }
   };
 
-  if (isCountdownEnabled && !isReleased) {
+  if (
+    (isCountdownEnabled && !isReleased) ||
+    authLoading ||
+    isAuthenticated ||
+    Boolean(getAccessToken())
+  ) {
     return (
-      <div className="min-h-screen bg-[#050814] flex flex-col items-center justify-center p-4">
-        <div className="w-8 h-8 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
