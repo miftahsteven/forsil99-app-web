@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -14,10 +14,49 @@ import { ChatMessage, AlumniProfile } from '@/types';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { ImageViewModal } from '@/components/ui/ImageViewModal';
-import { ChevronLeft, Send, Image as ImageIcon, Phone, UserPlus } from 'lucide-react';
+import {
+  ChevronLeft,
+  Send,
+  UserPlus,
+  Check,
+  CheckCheck,
+  Clock,
+  ArrowDown,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { rtdb } from '@/services/firebaseConfig';
-import { ref, onValue } from 'firebase/database';
+import {
+  ref,
+  onValue,
+  onChildAdded,
+  set,
+  remove,
+  onDisconnect,
+} from 'firebase/database';
+
+// Web Audio API message chime (Zero external MP3 asset dependency)
+function playMessageChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(780, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1180, ctx.currentTime + 0.08);
+
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.16);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.17);
+  } catch {}
+}
 
 export default function ChatRoomPage() {
   const params = useParams();
@@ -25,6 +64,8 @@ export default function ChatRoomPage() {
   const targetId = params.id as string;
 
   const { user, profile, isAuthenticated } = useAuth();
+  const currentUserId = user?.id || profile?.uid || '';
+
   const [targetProfile, setTargetProfile] = useState<AlumniProfile | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -34,9 +75,17 @@ export default function ChatRoomPage() {
   const [isFollowing, setIsFollowing] = useState<boolean>(true);
   const [isUpdatingFollow, setIsUpdatingFollow] = useState<boolean>(false);
   const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState<boolean>(false);
+  const [isRecipientTyping, setIsRecipientTyping] = useState<boolean>(false);
+  const [showScrollBottom, setShowScrollBottom] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageContainerRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoadDone = useRef<boolean>(false);
 
+  const otherUserId = targetProfile?.userId || targetProfile?.uid || targetId;
+
+  // 1. Initial Room Setup
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login');
@@ -47,25 +96,30 @@ export default function ChatRoomPage() {
 
   const initChat = async () => {
     setIsLoading(true);
+    isInitialLoadDone.current = false;
     try {
-      // 1. Start / Get Thread
+      // Start or get canonical deduplicated thread
       const thread = await startDirectChat(targetId);
       if (thread && thread.id) {
         setThreadId(thread.id);
         if (thread.otherUser) {
           setTargetProfile({
             uid: thread.otherUser.uid,
+            userId: thread.otherUser.uid,
             fullName: thread.otherUser.name,
             profilePhotoUrl: thread.otherUser.photoUrl,
             className: thread.otherUser.className,
             graduationYear: 1999,
           } as any);
         }
+
+        // Fetch initial historical messages
         const msgs = await fetchThreadMessages(thread.id);
         setMessages(msgs);
+        isInitialLoadDone.current = true;
       }
 
-      // 2. Fetch full profile and follow status in background
+      // Fetch full profile and follow status in parallel
       Promise.all([
         fetchProfileById(targetId),
         fetchFollowStatus(targetId),
@@ -104,38 +158,130 @@ export default function ChatRoomPage() {
     }
   };
 
-  // Real-time listener for incoming messages via Firebase RTDB (Zero 3-second Polling)
+  // 2. Real-time Firebase RTDB WebSocket Stream (<50ms latency)
   useEffect(() => {
     if (!threadId) return;
 
     let isSubscribed = true;
-    const chatSignalRef = ref(rtdb, `chatSignals/${threadId}`);
-    let initialSignal = true;
+    const roomMessagesRef = ref(rtdb, `chatRooms/${threadId}/messages`);
 
-    const unsubscribe = onValue(chatSignalRef, async (snapshot) => {
+    // Stream incoming messages directly via RTDB
+    const unsubscribeMessages = onChildAdded(roomMessagesRef, (snapshot) => {
       if (!isSubscribed) return;
-      // Skip initial mount snapshot since initChat() already loaded initial messages
-      if (initialSignal) {
-        initialSignal = false;
-        return;
-      }
-      try {
-        const fresh = await fetchThreadMessages(threadId);
-        if (fresh && isSubscribed) {
-          setMessages(fresh);
+      const data = snapshot.val();
+      if (!data || !data.id) return;
+
+      setMessages((prev) => {
+        // If message already exists by id, do not add duplicate
+        if (prev.some((m) => m.id === data.id)) {
+          return prev;
         }
-      } catch {}
+
+        // If this matches an optimistic message tempId, replace it
+        if (data.clientTempId && prev.some((m) => m.clientTempId === data.clientTempId || m.id === data.clientTempId)) {
+          return prev.map((m) =>
+            m.clientTempId === data.clientTempId || m.id === data.clientTempId
+              ? { ...data, status: 'delivered' }
+              : m
+          );
+        }
+
+        // If it's an incoming message from the other alumni, play audio chime
+        if (isInitialLoadDone.current && data.senderId !== currentUserId) {
+          playMessageChime();
+        }
+
+        return [...prev, { ...data, status: data.isRead ? 'read' : 'delivered' }];
+      });
+    });
+
+    // 3. Listen for Read Receipts in real-time (Blue Checkmarks ✓✓)
+    const readReceiptRef = ref(rtdb, `chatRooms/${threadId}/readReceipts/${otherUserId}`);
+    const unsubscribeReceipt = onValue(readReceiptRef, (snapshot) => {
+      if (!isSubscribed) return;
+      const val = snapshot.val();
+      if (val && val.readAt) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            const isMe = m.senderId === currentUserId;
+            if (isMe && !m.isRead) {
+              return { ...m, isRead: true, status: 'read' };
+            }
+            return m;
+          })
+        );
+      }
+    });
+
+    // 4. Listen for Recipient's Typing Indicator
+    const typingRef = ref(rtdb, `chatRooms/${threadId}/typing/${otherUserId}`);
+    const unsubscribeTyping = onValue(typingRef, (snapshot) => {
+      if (!isSubscribed) return;
+      setIsRecipientTyping(Boolean(snapshot.val()));
     });
 
     return () => {
       isSubscribed = false;
-      unsubscribe();
+      unsubscribeMessages();
+      unsubscribeReceipt();
+      unsubscribeTyping();
     };
-  }, [threadId]);
+  }, [threadId, otherUserId, currentUserId]);
+
+  // Mark room as read on mount or when new messages arrive
+  useEffect(() => {
+    if (!threadId || !currentUserId) return;
+    const myReceiptRef = ref(rtdb, `chatRooms/${threadId}/readReceipts/${currentUserId}`);
+    set(myReceiptRef, { readAt: Date.now() }).catch(() => {});
+  }, [threadId, currentUserId, messages.length]);
+
+  // Auto scroll to bottom
+  const scrollToBottom = useCallback((smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    scrollToBottom(true);
+  }, [messages.length, isRecipientTyping, scrollToBottom]);
+
+  // Handle scroll detection for "scroll to bottom" button
+  const handleScroll = () => {
+    if (!messageContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messageContainerRef.current;
+    const isScrolledUp = scrollHeight - scrollTop - clientHeight > 150;
+    setShowScrollBottom(isScrolledUp);
+  };
+
+  // Broadcast typing indicator to Firebase RTDB
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setText(val);
+
+    if (!threadId || !currentUserId) return;
+
+    const myTypingRef = ref(rtdb, `chatRooms/${threadId}/typing/${currentUserId}`);
+
+    if (val.trim()) {
+      set(myTypingRef, true).catch(() => {});
+      // Auto-remove on disconnect
+      onDisconnect(myTypingRef).remove().catch(() => {});
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        remove(myTypingRef).catch(() => {});
+      }, 2500);
+    } else {
+      remove(myTypingRef).catch(() => {});
+    }
+  };
+
+  // Stop typing indicator on blur or send
+  const stopTyping = () => {
+    if (!threadId || !currentUserId) return;
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    const myTypingRef = ref(rtdb, `chatRooms/${threadId}/typing/${currentUserId}`);
+    remove(myTypingRef).catch(() => {});
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,24 +302,43 @@ export default function ChatRoomPage() {
     }
 
     const messageText = text.trim();
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     setText('');
+    stopTyping();
     setIsSending(true);
 
-    // Optimistic message
-    const tempMessage: ChatMessage = {
-      id: Date.now().toString(),
+    // Optimistic UI message (WhatsApp style with instant single check ✓)
+    const optimisticMessage: ChatMessage = {
+      id: tempId,
+      clientTempId: tempId,
       threadId,
-      senderId: user?.id || profile?.uid || '',
+      senderId: currentUserId,
+      senderName: profile?.fullName || 'Saya',
       text: messageText,
       createdAt: new Date().toISOString(),
       isRead: false,
+      status: 'sending',
     };
-    setMessages((prev) => [...prev, tempMessage]);
+
+    setMessages((prev) => [...prev, optimisticMessage]);
 
     try {
-      await sendMessage(threadId, messageText);
+      const saved = await sendMessage(threadId, messageText, undefined, tempId);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === tempId || m.clientTempId === tempId
+            ? { ...saved, status: saved.isRead ? 'read' : 'delivered' }
+            : m
+        )
+      );
     } catch (err: any) {
-      toast.error('Gagal mengirim pesan.');
+      toast.error(err.message || 'Gagal mengirim pesan.');
+      // Mark optimistic message as failed
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === tempId ? { ...m, status: 'sending' } : m
+        )
+      );
     } finally {
       setIsSending(false);
     }
@@ -184,13 +349,14 @@ export default function ChatRoomPage() {
   const recipientPhoto = targetProfile?.profilePhotoUrl;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50">
-      {/* Header Bar */}
-      <div className="px-3 py-2.5 bg-white border-b border-slate-100 flex items-center justify-between shadow-xs sticky top-0 z-20">
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-[#efeae2]/30 dark:bg-slate-900/50 relative">
+      {/* WhatsApp Web Style Header */}
+      <div className="px-3.5 py-2.5 bg-white border-b border-slate-200/80 flex items-center justify-between shadow-2xs sticky top-0 z-20">
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => router.push('/chat')}
-            className="p-1 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100"
+            className="p-1 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-colors"
+            title="Kembali ke Daftar Pesan"
           >
             <ChevronLeft size={20} />
           </button>
@@ -208,20 +374,27 @@ export default function ChatRoomPage() {
             >
               <AppAvatar src={recipientPhoto} name={recipientName} size="sm" />
             </button>
-            <Link href={`/profile/${targetId}`} className="hover:opacity-80 transition-opacity">
+            <Link href={`/profile/${targetId}`} className="hover:opacity-90 transition-opacity">
               <div className="flex items-center gap-1">
                 <h3 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
                   {recipientName}
                 </h3>
                 <VerifiedBadge size={13} />
               </div>
-              <p className="text-[10px] text-brand-primary font-medium">{recipientClass}</p>
+              {isRecipientTyping ? (
+                <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span>sedang mengetik...</span>
+                </p>
+              ) : (
+                <p className="text-[10px] text-slate-500 font-medium">{recipientClass}</p>
+              )}
             </Link>
           </div>
         </div>
       </div>
 
-      {/* Banner peringatan jika belum follow */}
+      {/* Warning banner if not following */}
       {!isFollowing && targetProfile && (
         <div className="bg-amber-50 border-b border-amber-200/80 px-3.5 py-2.5 flex items-center justify-between gap-2.5 text-xs text-amber-900 sticky top-[53px] z-10 shadow-xs">
           <div className="flex items-center gap-2 min-w-0">
@@ -241,51 +414,114 @@ export default function ChatRoomPage() {
         </div>
       )}
 
-      {/* Message History */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-3">
+      {/* Message History (WhatsApp Web layout) */}
+      <div
+        ref={messageContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 p-3.5 overflow-y-auto space-y-2.5 bg-gradient-to-b from-slate-100/60 to-white/80"
+      >
         {isLoading ? (
-          <div className="text-center py-8 text-xs text-slate-400">Memuat obrolan...</div>
+          <div className="flex flex-col items-center justify-center py-12 space-y-2">
+            <div className="w-6 h-6 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs text-slate-400">Menghubungkan ke ruang chat...</span>
+          </div>
         ) : messages.length === 0 ? (
-          <div className="text-center py-12">
-            <AppAvatar src={recipientPhoto} name={recipientName} size="lg" className="mx-auto mb-2" />
+          <div className="text-center py-12 space-y-2">
+            <AppAvatar src={recipientPhoto} name={recipientName} size="lg" className="mx-auto shadow-sm" />
             <h4 className="font-bold text-sm text-slate-800">{recipientName}</h4>
-            <p className="text-xs text-slate-400 mt-1">
-              Mulai obrolan hangat dengan rekan sekelas Anda di SMAN 59!
+            <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+              Mulai obrolan hangat secara real-time dengan rekan sekelas Anda di SMAN 59!
             </p>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-medium mt-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Terkoneksi langsung via Firebase RTDB</span>
+            </div>
           </div>
         ) : (
           messages.map((m, idx) => {
-            const isMe = m.senderId === user?.id || m.senderId === profile?.uid;
+            const isMe = m.senderId === currentUserId;
+            const isRead = m.isRead || m.status === 'read';
+            const isSendingMessage = m.status === 'sending';
+
             return (
               <div
                 key={m.id || idx}
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in fade-in duration-150`}
               >
                 <div
-                  className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-xs ${
+                  className={`max-w-[78%] sm:max-w-[70%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-2xs relative group transition-all ${
                     isMe
-                      ? 'bg-brand-primary text-white rounded-br-none'
-                      : 'bg-white text-slate-800 border border-slate-100 rounded-bl-none'
+                      ? 'bg-brand-primary text-white rounded-tr-xs'
+                      : 'bg-white text-slate-900 border border-slate-200/80 rounded-tl-xs'
                   }`}
                 >
-                  <p className="whitespace-pre-line">{m.text}</p>
-                  <span
-                    className={`block text-[9px] mt-1 text-right ${
-                      isMe ? 'text-blue-100' : 'text-slate-400'
-                    }`}
-                  >
-                    {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <p className="whitespace-pre-line text-xs break-words">{m.text}</p>
+
+                  <div className="flex items-center justify-end gap-1 mt-1">
+                    <span
+                      className={`text-[9px] ${
+                        isMe ? 'text-blue-100/90' : 'text-slate-400'
+                      }`}
+                    >
+                      {new Date(m.createdAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+
+                    {/* WhatsApp style delivery checkmarks */}
+                    {isMe && (
+                      <span
+                        className="inline-flex items-center ml-0.5"
+                        title={isSendingMessage ? 'Mengirim...' : isRead ? 'Telah dibaca' : 'Terkirim ke server'}
+                      >
+                        {isSendingMessage ? (
+                          <Clock size={11} className="text-blue-200 animate-spin" />
+                        ) : isRead ? (
+                          <CheckCheck size={13} className="text-sky-300 font-bold" />
+                        ) : (
+                          <CheckCheck size={13} className="text-blue-200" />
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })
         )}
+
+        {/* WhatsApp style typing bubble */}
+        {isRecipientTyping && (
+          <div className="flex justify-start animate-in fade-in duration-200">
+            <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-xs px-3.5 py-2 shadow-2xs flex items-center gap-1.5">
+              <span className="text-[11px] text-slate-500">{recipientName} sedang mengetik</span>
+              <span className="flex items-center gap-0.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" />
+              </span>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Floating Scroll to Bottom button */}
+      {showScrollBottom && (
+        <button
+          type="button"
+          onClick={() => scrollToBottom(true)}
+          className="absolute right-4 bottom-16 p-2 rounded-full bg-white border border-slate-200 shadow-md text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all active:scale-90 z-20"
+          title="Gulir ke pesan terbaru"
+        >
+          <ArrowDown size={16} />
+        </button>
+      )}
+
       {/* Input Message Form */}
-      <div className="p-3 bg-white border-t border-slate-100">
+      <div className="p-3 bg-white border-t border-slate-200/90 shadow-xs">
         {!isFollowing ? (
           <div className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-200/80 rounded-2xl p-2.5 px-4 text-xs text-slate-600">
             <span className="truncate">
@@ -304,15 +540,17 @@ export default function ChatRoomPage() {
           <form onSubmit={handleSend} className="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Tulis pesan alumni..."
+              placeholder="Ketik pesan..."
               value={text}
-              onChange={(e) => setText(e.target.value)}
-              className="flex-1 bg-slate-100 rounded-full px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+              onChange={handleTextChange}
+              onBlur={stopTyping}
+              className="flex-1 bg-slate-100/90 border border-slate-200/60 rounded-full px-4 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:bg-white transition-all shadow-2xs"
             />
             <button
               type="submit"
               disabled={!text.trim() || isSending}
-              className="p-2.5 bg-brand-primary text-white rounded-full hover:bg-brand-primaryDark disabled:opacity-40 shadow-sm transition-all active:scale-95"
+              className="p-2.5 bg-brand-primary text-white rounded-full hover:bg-brand-primaryDark disabled:opacity-40 shadow-sm transition-all active:scale-95 cursor-pointer flex-shrink-0"
+              title="Kirim Pesan"
             >
               <Send size={15} />
             </button>

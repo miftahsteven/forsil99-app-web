@@ -256,7 +256,9 @@ export interface LiveLocation {
 export interface ChatMessage {
   id: string;
   threadId: string;
+  chatId?: string;
   senderId: string;
+  senderName?: string;
   sender?: {
     id: string;
     profile?: AlumniProfile;
@@ -265,6 +267,8 @@ export interface ChatMessage {
   imageUrl?: string;
   createdAt: string;
   isRead: boolean;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
+  clientTempId?: string;
 }
 
 export interface ChatThread {

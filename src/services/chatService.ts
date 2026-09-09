@@ -32,12 +32,14 @@ export async function fetchThreadMessages(threadId: string): Promise<ChatMessage
 export async function sendMessage(
   threadId: string,
   text: string,
-  imageUrl?: string
+  imageUrl?: string,
+  tempId?: string
 ): Promise<ChatMessage> {
   const res = await apiClient.post(`/chat/threads/${threadId}/messages`, {
     text,
     imageUrl,
     mediaUrl: imageUrl,
+    tempId,
   });
   return res.chatMessage || res.message;
 }
