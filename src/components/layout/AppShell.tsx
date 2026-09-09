@@ -46,6 +46,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, isOverallLoading, isPublicRoute, pathname, router, countdownActive, targetDateIso]);
 
+  // Root Page & History Trap:
+  // Ketika user sudah login dan berada di Beranda ('/'), back button browser dicegah agar
+  // tidak pernah kembali ke halaman login atau keluar aplikasi, melainkan tetap di Beranda ('/').
+  // Begitupun jika user sudah maju 2x page (misal: /events, /alumni) lalu kembali ke beranda,
+  // di titik akhir (endpoint back button), user tetap berada di Beranda ('/').
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isAuthenticated) return;
+
+    // 1. Tandai state di root page ('/') agar ada jangkar (anchor) di history stack
+    if (pathname === '/') {
+      if (!window.history.state || !window.history.state.ruang59_root) {
+        window.history.pushState({ ruang59_root: true }, '', '/');
+      }
+    }
+
+    // 2. Tangkap event popstate (tombol Back browser atau swipe back)
+    const handlePopState = () => {
+      // Jika browser mencoba mundur ke /login atau /register
+      if (
+        window.location.pathname === '/login' ||
+        window.location.pathname === '/register'
+      ) {
+        window.history.pushState({ ruang59_root: true }, '', '/');
+        router.replace('/');
+        return;
+      }
+
+      // Jika user berada di Beranda ('/') dan menekan Back button di titik akhir
+      if (window.location.pathname === '/') {
+        window.history.pushState({ ruang59_root: true }, '', '/');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [pathname, isAuthenticated, router]);
+
   // Jika belum rilis dan belum autentikasi, blokir tampilan halaman selain /countdown (termasuk /login & /register)
   if (!isAuthenticated && countdownActive && pathname !== '/countdown') {
     return (
