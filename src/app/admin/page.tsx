@@ -45,6 +45,13 @@ import {
   FileCheck,
   Tag,
   Eye,
+  Trash2,
+  Ban,
+  Shield,
+  ChevronDown,
+  ChevronUp,
+  Flag,
+  UserX,
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
@@ -74,6 +81,12 @@ export default function AdminVerificationPage() {
   const [sellerQueue, setSellerQueue] = useState<any[]>([]);
   const [adminQueueCategory, setAdminQueueCategory] = useState<'all' | 'seller' | 'alumni'>('seller');
   const [reports, setReports] = useState<any[]>([]);
+
+  // Report moderation state
+  const [isProcessingReport, setIsProcessingReport] = useState<string | null>(null);
+  const [expandedReporters, setExpandedReporters] = useState<Set<string>>(new Set());
+  const [warnBlockTargetId, setWarnBlockTargetId] = useState<string | null>(null);
+  const [warnBlockDays, setWarnBlockDays] = useState<number>(7);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
@@ -1008,23 +1021,260 @@ export default function AdminVerificationPage() {
         /* ================= TAB 4: MODERATION REPORTS ================= */
         reports.length === 0 ? (
           <EmptyState
-            icon={<CheckCircle2 size={28} />}
+            icon={<CheckCircle2 size={28} className="text-emerald-500" />}
             title="Tidak ada laporan aktif"
-            description="Komunitas alumni dalam keadaan kondusif dan tertib."
+            description="Komunitas alumni dalam keadaan kondusif dan tertib. Tidak ada konten yang dilaporkan."
           />
         ) : (
-          <div className="space-y-3">
-            {reports.map((rep) => (
-              <div key={rep.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-subtle space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-rose-600 flex items-center gap-1">
-                    <AlertTriangle size={14} /> Laporan {rep.targetType}
-                  </span>
-                  <span className="text-[10px] text-slate-400">{rep.status}</span>
+          <div className="space-y-4">
+            <p className="text-xs text-slate-500 px-1 font-medium">
+              Menampilkan <strong>{reports.length} konten</strong> yang dilaporkan oleh anggota komunitas:
+            </p>
+
+            {reports.map((rep: any) => {
+              const cd = rep.contentDetail;
+              const isExpanded = expandedReporters.has(rep.targetId);
+              const isActing = isProcessingReport === rep.targetId;
+              const isWarnMode = warnBlockTargetId === rep.targetId;
+
+              const CATEGORY_LABEL: Record<string, string> = {
+                spam: 'Spam / Iklan Berulang', harassment: 'Pelecehan / Perundungan',
+                hate_speech: 'Ujaran Kebencian', misinformation: 'Informasi Menyesatkan',
+                inappropriate: 'Konten Tidak Pantas', violence: 'Konten Kekerasan',
+                privacy: 'Pelanggaran Privasi', copyright: 'Pelanggaran Hak Cipta', other: 'Lainnya',
+              };
+              const categoryLabel = rep.categories?.map((c: string) => CATEGORY_LABEL[c] || c).join(', ') || 'Lainnya';
+
+              return (
+                <div key={rep.targetId} className="bg-white rounded-2xl border border-rose-100 shadow-sm overflow-hidden">
+                  {/* Card Header */}
+                  <div className="bg-rose-50 px-4 py-2.5 flex items-center justify-between border-b border-rose-100">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                        {rep.targetType === 'post' ? '📄 Postingan' : rep.targetType === 'comment' ? '💬 Komentar' : rep.targetType}
+                      </span>
+                      {rep.reportCount > 1 && (
+                        <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          🚩 {rep.reportCount}x Dilaporkan
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400">
+                      {rep.firstCreatedAt ? format(new Date(rep.firstCreatedAt), 'dd MMM yyyy', { locale: localeId }) : ''}
+                    </span>
+                  </div>
+
+                  <div className="p-4 space-y-3">
+                    {/* Content Preview */}
+                    {cd ? (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1">
+                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">Konten yang Dilaporkan</p>
+                        <p className="text-xs text-slate-700 italic leading-relaxed">
+                          &ldquo;{cd.textPreview || '(konten tanpa teks)'}&rdquo;
+                          {cd.textPreview?.length >= 150 ? '...' : ''}
+                        </p>
+                        {cd.moderationStatus === 'removed' && (
+                          <span className="text-[10px] text-rose-500 font-semibold">(Sudah dihapus)</span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 rounded-xl p-3 text-xs text-slate-400 italic">Konten sudah tidak tersedia.</div>
+                    )}
+
+                    {/* Creator Info */}
+                    {cd && (
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex-shrink-0">
+                          {cd.authorPhoto ? (
+                            <img src={cd.authorPhoto} alt={cd.authorName} className="w-8 h-8 rounded-full object-cover border border-slate-200" />
+                          ) : (
+                            <AppAvatar name={cd.authorName} size="sm" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-800 truncate">{cd.authorName}</p>
+                          <p className="text-[10px] text-slate-400">{cd.authorClass} &bull; Pembuat Konten</p>
+                        </div>
+                        {cd.id && cd.moderationStatus !== 'removed' && (
+                          <a
+                            href={rep.targetType === 'comment' ? `/posts/${cd.postId}` : `/posts/${cd.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-shrink-0 text-[10px] text-brand-primary flex items-center gap-0.5 hover:underline"
+                          >
+                            <ExternalLink size={11} /> Lihat
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Alasan */}
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-2.5">
+                      <p className="text-[10px] text-amber-700 font-semibold mb-1 flex items-center gap-1">
+                        <Flag size={11} /> Alasan Laporan
+                      </p>
+                      <p className="text-xs text-amber-800 font-medium">{categoryLabel}</p>
+                      {rep.descriptions?.length > 0 && (
+                        <p className="text-[11px] text-amber-700 mt-1 italic">&ldquo;{rep.descriptions[0]}&rdquo;</p>
+                      )}
+                    </div>
+
+                    {/* Reporters */}
+                    <div>
+                      <button
+                        onClick={() => setExpandedReporters(prev => {
+                          const next = new Set(prev);
+                          if (next.has(rep.targetId)) next.delete(rep.targetId);
+                          else next.add(rep.targetId);
+                          return next;
+                        })}
+                        className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-700 transition"
+                      >
+                        <UserX size={12} />
+                        <span className="font-medium">
+                          {rep.reportCount === 1
+                            ? `Dilaporkan oleh: ${rep.reporters?.[0]?.fullName || 'Alumni'}`
+                            : `${rep.reportCount} alumni melaporkan konten ini`}
+                        </span>
+                        {rep.reportCount > 1 && (
+                          isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+                        )}
+                      </button>
+                      {isExpanded && rep.reporters?.length > 1 && (
+                        <div className="mt-2 space-y-1.5 pl-2 border-l-2 border-rose-100">
+                          {rep.reporters.map((r: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              {r.profilePhotoUrl ? (
+                                <img src={r.profilePhotoUrl} alt={r.fullName} className="w-5 h-5 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-500">
+                                  {r.fullName?.[0]}
+                                </div>
+                              )}
+                              <span className="text-[10px] text-slate-600">{r.fullName} &bull; {r.className}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Warn+Block Day Picker (shown when in warn mode) */}
+                    {isWarnMode && (
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-2">
+                        <p className="text-xs font-semibold text-red-700 flex items-center gap-1">
+                          <Ban size={13} /> Pilih Durasi Blokir Akun Pembuat
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[1, 3, 7, 14, 30].map(d => (
+                            <button
+                              key={d}
+                              onClick={() => setWarnBlockDays(d)}
+                              className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all ${
+                                warnBlockDays === d
+                                  ? 'bg-red-600 text-white border-red-600'
+                                  : 'bg-white text-red-700 border-red-300 hover:bg-red-50'
+                              }`}
+                            >
+                              {d} Hari
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={() => setWarnBlockTargetId(null)}
+                            disabled={isActing}
+                            className="flex-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-300 text-slate-600 hover:bg-slate-50"
+                          >
+                            Batal
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Hapus konten & blokir pembuat selama ${warnBlockDays} hari? Ini akan memaksa logout segera.`)) return;
+                              setIsProcessingReport(rep.targetId);
+                              try {
+                                const { apiClient } = await import('@/services/apiClient');
+                                await apiClient.post(`/reports/${rep.targetId}/action`, { action: 'warn_block', blockDays: warnBlockDays });
+                                toast.success(`Konten dihapus & akun diblokir ${warnBlockDays} hari.`);
+                                setReports(prev => prev.filter((r: any) => r.targetId !== rep.targetId));
+                                setWarnBlockTargetId(null);
+                              } catch (err: any) {
+                                toast.error(err.message || 'Gagal memproses peringatan keras.');
+                              } finally { setIsProcessingReport(null); }
+                            }}
+                            disabled={isActing}
+                            className="flex-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 flex items-center justify-center gap-1"
+                          >
+                            {isActing ? '...' : <><Ban size={12} /> Konfirmasi Blokir</>}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    {!isWarnMode && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {/* Hapus Laporan */}
+                        <button
+                          id={`btn-dismiss-${rep.targetId}`}
+                          onClick={async () => {
+                            if (!confirm('Tutup semua laporan untuk konten ini? Konten tidak akan dihapus.')) return;
+                            setIsProcessingReport(rep.targetId);
+                            try {
+                              const { apiClient } = await import('@/services/apiClient');
+                              await apiClient.post(`/reports/${rep.targetId}/action`, { action: 'dismiss' });
+                              toast.success('Laporan ditutup.');
+                              setReports(prev => prev.filter((r: any) => r.targetId !== rep.targetId));
+                            } catch (err: any) {
+                              toast.error(err.message || 'Gagal menutup laporan.');
+                            } finally { setIsProcessingReport(null); }
+                          }}
+                          disabled={isActing}
+                          className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 disabled:opacity-60 flex items-center gap-1"
+                        >
+                          {isActing ? '...' : <><X size={12} /> Hapus Laporan</>}
+                        </button>
+
+                        {/* Hapus Konten */}
+                        {cd?.moderationStatus !== 'removed' && (
+                          <button
+                            id={`btn-delete-${rep.targetId}`}
+                            onClick={async () => {
+                              if (!confirm(`Hapus konten "${cd?.textPreview?.substring(0, 40) || '...'}"\ dan notifikasi pembuat?`)) return;
+                              setIsProcessingReport(rep.targetId);
+                              try {
+                                const { apiClient } = await import('@/services/apiClient');
+                                await apiClient.post(`/reports/${rep.targetId}/action`, { action: 'delete_content' });
+                                toast.success('Konten dihapus & email terkirim ke pembuat.');
+                                setReports(prev => prev.filter((r: any) => r.targetId !== rep.targetId));
+                              } catch (err: any) {
+                                toast.error(err.message || 'Gagal menghapus konten.');
+                              } finally { setIsProcessingReport(null); }
+                            }}
+                            disabled={isActing}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200 hover:bg-amber-200 disabled:opacity-60 flex items-center gap-1"
+                          >
+                            {isActing ? '...' : <><Trash2 size={12} /> Hapus Konten</>}
+                          </button>
+                        )}
+
+                        {/* Peringatan Keras */}
+                        <button
+                          id={`btn-warn-${rep.targetId}`}
+                          onClick={() => {
+                            setWarnBlockTargetId(rep.targetId);
+                            setWarnBlockDays(7);
+                          }}
+                          disabled={isActing}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60 flex items-center gap-1 shadow-sm"
+                        >
+                          <Shield size={12} /> Peringatan Keras
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-xs text-slate-700">{rep.description || rep.category}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )
       )}
