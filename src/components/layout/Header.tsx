@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { MessageSquare, Bell, Calendar, ShieldCheck, User, UserCheck, Shield } from 'lucide-react';
+import { MessageSquare, Bell, Calendar, ShieldCheck, User, UserCheck, Shield, Info } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useNotification } from '@/context/NotificationContext';
 import { AppAvatar } from '@/components/ui/AppAvatar';
@@ -110,6 +110,21 @@ export function Header() {
                 )}
               </Link>
 
+              {/* Tentang Forsil 99 & Sambutan Ketua */}
+              <Link
+                href="/about"
+                prefetch={false}
+                className={`p-2 rounded-full transition-colors ${
+                  pathname === '/about'
+                    ? 'text-brand-primary bg-blue-50'
+                    : 'text-slate-600 hover:text-brand-primary hover:bg-slate-100'
+                }`}
+                title="Tentang Forsil 99 & Sambutan Ketua"
+                aria-label="Tentang Forsil 99 & Sambutan Ketua"
+              >
+                <Info size={19} className={pathname === '/about' ? 'text-brand-primary' : 'text-slate-600'} />
+              </Link>
+
               {/* Kebijakan Privasi & Kepatuhan UU PDP */}
               <Link
                 href="/privacy"
@@ -127,6 +142,7 @@ export function Header() {
 
               {/* Profile Avatar */}
               <Link
+                id="header-profile-avatar"
                 href={`/profile/${user?.id || profile?.uid || 'me'}`}
                 prefetch={false}
                 className="ml-1 active:scale-95 transition-transform"
@@ -141,6 +157,18 @@ export function Header() {
             </>
           ) : (
             <div className="flex items-center gap-1.5">
+              <Link
+                href="/about"
+                prefetch={false}
+                className={`p-2 rounded-full transition-colors ${
+                  pathname === '/about'
+                    ? 'text-brand-primary bg-blue-50'
+                    : 'text-slate-600 hover:text-brand-primary hover:bg-slate-100'
+                }`}
+                title="Tentang Forsil 99 & Sambutan Ketua"
+              >
+                <Info size={19} className={pathname === '/about' ? 'text-brand-primary' : 'text-slate-600'} />
+              </Link>
               <Link
                 href="/privacy"
                 prefetch={false}

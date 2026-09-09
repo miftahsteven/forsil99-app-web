@@ -19,6 +19,8 @@ import { fetchPendingReferrals } from '@/services/authService';
 import { AppNotification, AlumniRegistration } from '@/types';
 import { soundFx } from '@/utils/audioFx';
 import { NotificationToast } from '@/components/notifications/NotificationToast';
+import { rtdb } from '@/services/firebaseConfig';
+import { ref, onValue } from 'firebase/database';
 
 interface NotificationContextValue {
   notifications: AppNotification[];
@@ -55,6 +57,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const knownNotificationIds = useRef<Set<string>>(new Set());
   const knownReferralIds = useRef<Set<string>>(new Set());
   const isInitialLoad = useRef<boolean>(true);
+  const lastSignalTime = useRef<number>(0);
+  const lastFetchTimeRef = useRef<number>(Date.now());
 
   // Inisialisasi dukungan Notification API pada browser
   useEffect(() => {
@@ -106,6 +110,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const refreshNotifications = useCallback(async () => {
     if (!isAuthenticated) return;
     const accountId = user?.id || profile?.uid || '';
+    lastFetchTimeRef.current = Date.now();
 
     try {
       const [notifs, referrals] = await Promise.all([
@@ -172,20 +177,57 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       knownNotificationIds.current.clear();
       knownReferralIds.current.clear();
       isInitialLoad.current = true;
+      lastSignalTime.current = 0;
     }
   }, [isAuthenticated, refreshNotifications]);
 
-  // Realtime Polling (setiap 10 detik saat aktif) + Immediate fetch saat jendela/tab difokuskan
+  // Real-time Push Listener via Firebase Realtime Database (Zero Server Polling)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const accountId = user?.id || profile?.uid;
+    if (!accountId) return;
+
+    // Listen to real-time push signal from Firebase RTDB (managed by Google Cloud)
+    const signalRef = ref(rtdb, `notificationsSignal/${accountId}`);
+    const unsubscribe = onValue(
+      signalRef,
+      (snapshot) => {
+        const val = snapshot.val();
+        if (!val || !val.updatedAt) return;
+
+        // Skip initial attachment trigger to prevent double-fetch on login
+        if (lastSignalTime.current === 0) {
+          lastSignalTime.current = val.updatedAt;
+          return;
+        }
+
+        // Only fetch when timestamp has updated from a fresh backend event
+        if (val.updatedAt > lastSignalTime.current) {
+          lastSignalTime.current = val.updatedAt;
+          refreshNotifications();
+        }
+      },
+      (error) => {
+        console.warn('Firebase RTDB notification listener warning:', error);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isAuthenticated, user?.id, profile?.uid, refreshNotifications]);
+
+  // Throttled Window Focus / Visibility Revalidation (minimum cooldown 3 menit)
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const interval = setInterval(() => {
-      refreshNotifications();
-    }, 10000);
-
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
-        refreshNotifications();
+        const now = Date.now();
+        // Hanya lakukan re-fetch jika tab sudah tidak difokuskan lebih dari 3 menit
+        if (now - lastFetchTimeRef.current > 3 * 60 * 1000) {
+          refreshNotifications();
+        }
       }
     };
 
@@ -193,7 +235,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };

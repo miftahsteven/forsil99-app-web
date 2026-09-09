@@ -18,9 +18,15 @@ import {
   Globe,
   Users,
   Lock,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { compressImage, processPostImageFiles } from '@/utils/imageCompressor';
+import {
+  compressImage,
+  processPostImageFiles,
+  MAX_POST_IMAGES,
+  MAX_IMAGE_FILE_SIZE_BYTES,
+} from '@/utils/imageCompressor';
 
 function CreatePostContent() {
   const router = useRouter();
@@ -49,14 +55,20 @@ function CreatePostContent() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    if (mediaList.length >= MAX_POST_IMAGES) {
+      toast.error('Batas maksimal 5 foto per postingan telah tercapai sesuai kebijakan.');
+      e.target.value = '';
+      return;
+    }
+
     setIsProcessingMedia(true);
     try {
       const fileArray = Array.from(files);
       const processed = await processPostImageFiles(fileArray, mediaList.length);
       setMediaList((prev) => [...prev, ...processed]);
-      toast.success(`${processed.length} media berhasil ditambahkan.`);
+      toast.success(`${processed.length} foto berhasil ditambahkan.`);
     } catch (err: any) {
-      toast.error('Gagal memproses gambar: ' + (err.message || 'Terjadi kesalahan'));
+      toast.error(err.message || 'Gagal memproses gambar');
     } finally {
       setIsProcessingMedia(false);
       // Reset input value to allow re-selection
@@ -67,22 +79,36 @@ function CreatePostContent() {
   const handleThenPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
+      toast.error('Ukuran foto melebihi batas maksimal 100 MB sesuai kebijakan.');
+      e.target.value = '';
+      return;
+    }
     try {
       const compressed = await compressImage(file, { imageCount: 2 });
       setThenPhotoUrl(compressed);
     } catch (err: any) {
       toast.error('Gagal memproses foto: ' + err.message);
+    } finally {
+      e.target.value = '';
     }
   };
 
   const handleNowPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
+      toast.error('Ukuran foto melebihi batas maksimal 100 MB sesuai kebijakan.');
+      e.target.value = '';
+      return;
+    }
     try {
       const compressed = await compressImage(file, { imageCount: 2 });
       setNowPhotoUrl(compressed);
     } catch (err: any) {
       toast.error('Gagal memproses foto: ' + err.message);
+    } finally {
+      e.target.value = '';
     }
   };
 
@@ -261,20 +287,56 @@ function CreatePostContent() {
           </div>
         )}
 
+        {/* Kebijakan Batas Unggahan Foto */}
+        <div className="my-3 p-3 bg-sky-50/80 border border-sky-100/90 rounded-xl flex items-start gap-2.5">
+          <Info size={16} className="text-sky-600 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-slate-700">
+            <span className="font-semibold text-sky-950 block mb-0.5">
+              Kebijakan Pengunggahan Foto
+            </span>
+            <p className="leading-relaxed text-[11.5px] text-slate-600">
+              Postingan Anda dibatasi sesuai kebijakan komunitas: maksimal <strong className="text-slate-800 font-semibold">5 foto</strong> per postingan dan ukuran maksimal <strong className="text-slate-800 font-semibold">100 MB</strong> per foto untuk menjaga kenyamanan serta performa server bersama.
+            </p>
+          </div>
+        </div>
+
         {/* Bottom Bar: Attachments & Submit */}
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-          <label className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 cursor-pointer transition-colors ${isProcessingMedia ? 'opacity-60 pointer-events-none' : ''}`}>
-            <ImageIcon size={16} className="text-emerald-600" />
-            <span>{isProcessingMedia ? 'Mengompres...' : 'Lampirkan Foto / Video'}</span>
-            <input
-              type="file"
-              accept="image/*,video/*"
-              multiple
-              disabled={isProcessingMedia}
-              onChange={handleMediaUpload}
-              className="hidden"
-            />
-          </label>
+        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <label
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                mediaList.length >= MAX_POST_IMAGES
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-dashed border-slate-200'
+                  : isProcessingMedia
+                  ? 'bg-slate-100 text-slate-400 opacity-60 pointer-events-none'
+                  : 'text-slate-700 bg-slate-100 hover:bg-slate-200 cursor-pointer active:scale-95'
+              }`}
+            >
+              <ImageIcon
+                size={16}
+                className={mediaList.length >= MAX_POST_IMAGES ? 'text-slate-400' : 'text-emerald-600'}
+              />
+              <span>
+                {isProcessingMedia
+                  ? 'Memproses Foto...'
+                  : `Lampirkan Foto (${mediaList.length}/${MAX_POST_IMAGES})`}
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                disabled={isProcessingMedia || mediaList.length >= MAX_POST_IMAGES}
+                onChange={handleMediaUpload}
+                className="hidden"
+              />
+            </label>
+
+            {mediaList.length >= MAX_POST_IMAGES && (
+              <span className="text-[11px] text-amber-700 font-medium bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                Batas 5 foto tercapai
+              </span>
+            )}
+          </div>
 
           <AppButton
             onClick={handleSubmit}

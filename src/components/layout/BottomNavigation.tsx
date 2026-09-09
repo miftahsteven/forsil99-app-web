@@ -17,18 +17,21 @@ export function BottomNavigation() {
 
   const tabs = [
     {
+      id: 'nav-home',
       label: 'Beranda',
       href: '/',
       icon: Home,
       isActive: pathname === '/',
     },
     {
+      id: 'nav-alumni',
       label: 'Alumni',
       href: '/alumni',
       icon: Users,
       isActive: pathname?.startsWith('/alumni'),
     },
     {
+      id: 'nav-posting',
       label: 'Posting',
       href: '/create',
       icon: Plus,
@@ -36,12 +39,14 @@ export function BottomNavigation() {
       isActive: pathname === '/create',
     },
     {
+      id: 'nav-seller',
       label: 'Seller 99',
       href: '/shop',
       icon: ShoppingBag,
       isActive: pathname?.startsWith('/shop'),
     },
     {
+      id: 'nav-radar',
       label: 'Radar',
       href: '/live',
       icon: Radio,
@@ -58,6 +63,7 @@ export function BottomNavigation() {
           if (tab.isCenter) {
             return (
               <Link
+                id={tab.id}
                 key={idx}
                 href={tab.href}
                 prefetch={false}
@@ -81,6 +87,7 @@ export function BottomNavigation() {
 
           return (
             <Link
+              id={tab.id}
               key={idx}
               href={tab.href}
               prefetch={false}

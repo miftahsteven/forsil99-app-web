@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { MessageSquare, UserPlus, UserCheck, MapPin, Briefcase } from 'lucide-react';
 import { AlumniProfile } from '@/types';
 import { useAuth } from '@/context/AuthContext';
@@ -9,6 +10,7 @@ import { toggleFollow } from '@/services/authService';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { ProfileCategoryBadge } from '@/components/ui/ProfileCategoryBadge';
+import { ImageViewModal } from '@/components/ui/ImageViewModal';
 import { toast } from 'sonner';
 
 interface AlumniCardProps {
@@ -17,11 +19,13 @@ interface AlumniCardProps {
 }
 
 export function AlumniCard({ alumni, isFollowingInitial = false }: AlumniCardProps) {
+  const router = useRouter();
   const { user, profile, isAuthenticated } = useAuth();
   const [isFollowing, setIsFollowing] = useState<boolean>(
     alumni.isFollowing !== undefined ? alumni.isFollowing : isFollowingInitial
   );
   const [isUpdatingFollow, setIsUpdatingFollow] = useState<boolean>(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (alumni.isFollowing !== undefined) {
@@ -66,17 +70,58 @@ export function AlumniCard({ alumni, isFollowingInitial = false }: AlumniCardPro
     }
   };
 
+  const handleChatClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!isAuthenticated) {
+      toast.error('Silakan masuk terlebih dahulu untuk memulai obrolan.');
+      return;
+    }
+
+    if (!isFollowing) {
+      toast.error(
+        `Anda harus mengikuti (follow) ${alumni.fullName} terlebih dahulu untuk memulai obrolan chat.`,
+        {
+          action: {
+            label: '+ Ikuti Sekarang',
+            onClick: () => handleFollowClick(e),
+          },
+          duration: 5000,
+        }
+      );
+      return;
+    }
+
+    router.push(`/chat/${targetId}`);
+  };
+
   return (
     <div className="bg-white rounded-2xl p-4 border border-slate-100/90 shadow-subtle flex items-center justify-between gap-3 hover:border-slate-200 transition-all">
       {/* Left: Avatar + Info */}
-      <Link href={`/profile/${targetId}`} className="flex items-center gap-3.5 flex-1 min-w-0 group">
-        <AppAvatar
-          src={alumni.profilePhotoUrl}
-          name={alumni.fullName}
-          size="md"
-          className="group-hover:scale-105 transition-transform"
-        />
-        <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-3.5 flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (alumni.profilePhotoUrl) {
+              setIsPreviewOpen(true);
+            }
+          }}
+          className={`relative flex-shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-brand-primary/40 group/avatar ${
+            alumni.profilePhotoUrl ? 'cursor-pointer' : 'cursor-default'
+          }`}
+          title={alumni.profilePhotoUrl ? `Lihat foto ${alumni.fullName} lebih besar` : undefined}
+        >
+          <AppAvatar
+            src={alumni.profilePhotoUrl}
+            name={alumni.fullName}
+            size="md"
+            className="group-hover/avatar:scale-105 transition-transform"
+          />
+        </button>
+
+        <Link href={`/profile/${targetId}`} className="flex-1 min-w-0 group">
           <div className="flex items-center gap-1.5 flex-wrap">
             <h4 className="font-bold text-sm text-slate-900 group-hover:text-brand-primary transition-colors truncate">
               {alumni.fullName}
@@ -115,8 +160,8 @@ export function AlumniCard({ alumni, isFollowingInitial = false }: AlumniCardPro
               )}
             </div>
           )}
-        </div>
-      </Link>
+        </Link>
+      </div>
 
       {/* Right: Actions */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -146,16 +191,27 @@ export function AlumniCard({ alumni, isFollowingInitial = false }: AlumniCardPro
               )}
             </button>
 
-            <Link
-              href={`/chat/${targetId}`}
+            <button
+              type="button"
+              onClick={handleChatClick}
               className="p-2 rounded-xl bg-blue-50 text-brand-primary hover:bg-blue-100 transition-colors cursor-pointer"
-              title="Kirim Pesan Langsung"
+              title={isFollowing ? 'Kirim Pesan Langsung' : 'Ikuti alumni terlebih dahulu untuk chat'}
             >
               <MessageSquare size={16} />
-            </Link>
+            </button>
           </>
         )}
       </div>
+
+      {/* Lightbox Modal Foto Profil */}
+      <ImageViewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        imageUrl={alumni.profilePhotoUrl}
+        altText={`Foto profil ${alumni.fullName}`}
+        title={alumni.fullName}
+        subtitle={`${alumni.className || 'SMAN 59'} (Angkatan 1999)`}
+      />
     </div>
   );
 }

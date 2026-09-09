@@ -10,7 +10,8 @@ import { Toaster } from 'sonner';
 import { hasSeenWelcome } from '@/config/releaseConfig';
 import { useReleaseDate } from '@/hooks/useReleaseDate';
 
-const PUBLIC_ROUTES = ['/login', '/register', '/awaiting-approval', '/countdown'];
+const AUTH_FLOW_ROUTES = ['/login', '/register', '/awaiting-approval', '/countdown', '/change-password'];
+const PUBLIC_ROUTES = [...AUTH_FLOW_ROUTES, '/privacy', '/about'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -19,6 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { isReleased, isCountdownEnabled, isLoading: releaseLoading, targetDateIso } = useReleaseDate();
 
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+  const isAuthFlow = AUTH_FLOW_ROUTES.includes(pathname);
   const countdownActive = isCountdownEnabled && !isReleased;
   const isOverallLoading = authLoading || releaseLoading;
 
@@ -106,14 +108,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-slate-100/70 text-slate-900 flex justify-center antialiased selection:bg-brand-primary/20 selection:text-brand-primary selection:font-semibold">
       {/* Centered Mobile-First Frame */}
       <div className="w-full max-w-2xl min-h-screen bg-surface-bg flex flex-col relative shadow-xl md:border-x md:border-slate-200/80">
-        {!isPublicRoute && <Header />}
+        {!isAuthFlow && <Header />}
 
         {/* Main Content Area with Bottom Nav Padding */}
-        <main className={`flex-1 overflow-x-hidden ${!isPublicRoute ? 'pb-20' : ''}`}>
+        <main className={`flex-1 overflow-x-hidden ${!isAuthFlow && isAuthenticated ? 'pb-20' : !isAuthFlow ? 'pb-8' : ''}`}>
           {children}
         </main>
 
-        {!isPublicRoute && <BottomNavigation />}
+        {!isAuthFlow && isAuthenticated && <BottomNavigation />}
       </div>
 
       <Toaster position="top-center" richColors />

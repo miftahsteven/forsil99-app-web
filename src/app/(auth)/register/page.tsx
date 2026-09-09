@@ -26,9 +26,14 @@ import {
   Timer,
   ArrowLeft,
   MailCheck,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useReleaseDate } from '@/hooks/useReleaseDate';
+import { WalkthroughTrigger } from '@/components/walkthrough/WalkthroughTrigger';
+import { REGISTER_WALKTHROUGH } from '@/config/walkthroughData';
+import { PrivacyPolicyModal } from '@/components/legal/PrivacyPolicyModal';
 
 const CLASSES = [
   '3 IPA 1',
@@ -56,10 +61,11 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState<string>('');
   const [nickname, setNickname] = useState<string>('');
   const [className, setClassName] = useState<string>('3 IPA 1');
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
   const [phone, setPhone] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
-  
+
   // Referral Search State
   const [referralQuery, setReferralQuery] = useState<string>('');
   const [referralId, setReferralId] = useState<string>('');
@@ -340,8 +346,26 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen py-8 px-4 bg-gradient-to-b from-blue-50/50 via-white to-slate-50">
       <div className="w-full max-w-md mx-auto">
+        {/* Top Navigation Bar with Menu Tentang Forsil 99 */}
+        <div className="flex items-center justify-between pb-3">
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            <span>Ke Halaman Login</span>
+          </Link>
+          <Link
+            href="/about"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200/90 text-xs font-bold text-brand-primary hover:border-brand-primary hover:bg-blue-50/40 shadow-2xs transition-all active:scale-95"
+          >
+            <span>Tentang Forsil 99</span>
+            <ChevronRight size={13} className="text-brand-primary" />
+          </Link>
+        </div>
+
         {/* Header */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-5">
           <Link href="/login" className="inline-block mb-3">
             <img
               src="/images/forsil99apps.png"
@@ -358,6 +382,38 @@ export default function RegisterPage() {
               : 'Khusus Alumni SMAN 59 Jakarta Angkatan 1999 (Perak)'}
           </p>
         </div>
+
+        {/* Menu Tentang Forsil 99 (Membangun Kepercayaan Alumni Sebelum Mendaftar) */}
+        {step !== 'otp' && (
+          <Link
+            href="/about"
+            className="mb-5 block group bg-gradient-to-r from-blue-50/95 via-indigo-50/80 to-amber-50/70 hover:from-blue-100/90 hover:to-indigo-100/80 border border-blue-200/80 hover:border-blue-300 rounded-2xl p-3.5 transition-all duration-200 shadow-xs hover:shadow-md"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white shadow-xs border border-blue-200/70 flex items-center justify-center text-brand-primary flex-shrink-0 group-hover:scale-105 transition-transform">
+                  <Sparkles size={18} className="text-amber-500" />
+                </div>
+                <div className="text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-brand-primary transition-colors">
+                      Tentang Forsil 99
+                    </span>
+                    <span className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200/80 px-2 py-0.5 rounded-full">
+                      Sambutan Ketua
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                    Kenali wadah silaturahmi & sambutan resmi Ketua sebelum mendaftar
+                  </p>
+                </div>
+              </div>
+              <div className="flex-shrink-0 text-slate-400 group-hover:text-brand-primary group-hover:translate-x-0.5 transition-all">
+                <ChevronRight size={18} />
+              </div>
+            </div>
+          </Link>
+        )}
 
         {step === 'otp' ? (
           /* STEP 2: OTP Verification Screen */
@@ -451,7 +507,7 @@ export default function RegisterPage() {
           </div>
         ) : (
           /* STEP 1: Registration Form */
-          <form onSubmit={handleRequestOtp} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-card space-y-4">
+          <form id="register-form-box" onSubmit={handleRequestOtp} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-card space-y-4">
             <AppInput
               label="Nama Lengkap Sesuai Ijazah / Buku Kenangan"
               placeholder="Contoh: Steven Rahardjo"
@@ -496,7 +552,7 @@ export default function RegisterPage() {
               required
             />
 
-            <div>
+            <div id="register-email-section">
               <AppInput
                 label="Alamat Email Aktif (Akun Google / Pribadi)"
                 type="email"
@@ -522,7 +578,7 @@ export default function RegisterPage() {
             />
 
             {/* Referral Selection (Wajib: Cari Rekan Seangkatan Min 3 Huruf) */}
-            <div className="space-y-2 pt-2 border-t border-slate-100">
+            <div id="register-referral-section" className="space-y-2 pt-2 border-t border-slate-100">
               <label className="block text-xs font-semibold text-slate-700">
                 Pilih Rekan Alumni Sebagai Referensi Verifikasi: <span className="text-rose-500 font-bold">* (Wajib)</span>
               </label>
@@ -643,7 +699,7 @@ export default function RegisterPage() {
             </div>
 
             {/* Selfie Photo Upload (Wajib: Galeri / Kamera / Drive) */}
-            <div className="pt-2 border-t border-slate-100 space-y-2">
+            <div id="register-photo-section" className="pt-2 border-t border-slate-100 space-y-2">
               <label className="block text-xs font-semibold text-slate-700">
                 Foto Selfie Wajah / Profil: <span className="text-rose-500 font-bold">* (Wajib)</span>
               </label>
@@ -698,9 +754,13 @@ export default function RegisterPage() {
 
             <p className="text-[11px] text-slate-500 text-center leading-relaxed pt-1">
               Dengan melanjutkan, Anda menyetujui{' '}
-              <Link href="/privacy" target="_blank" className="text-brand-primary font-bold hover:underline inline-flex items-center gap-0.5">
-                <span>Kebijakan Privasi & UU PDP</span>
-              </Link>{' '}
+              <button
+                type="button"
+                onClick={() => setIsPrivacyModalOpen(true)}
+                className="text-brand-primary font-bold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+              >
+                <span>Kebijakan Privasi Database Forsil99</span>
+              </button>{' '}
               komunitas Forsil 99.
             </p>
 
@@ -716,11 +776,33 @@ export default function RegisterPage() {
           </form>
         )}
 
-        <div className="text-center mt-4">
-          <Link href="/login" className="text-xs text-slate-600 hover:text-brand-primary font-semibold">
+        <div className="text-center mt-4 space-y-2">
+          <Link href="/login" className="text-xs text-slate-600 hover:text-brand-primary font-semibold block">
             Sudah punya akun? Masuk di sini
           </Link>
+          <div className="flex items-center justify-center gap-3 text-[11px] text-slate-400 pt-1">
+            <Link href="/about" className="hover:text-brand-primary hover:underline transition-colors font-medium">
+              Tentang Forsil 99
+            </Link>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => setIsPrivacyModalOpen(true)}
+              className="hover:text-brand-primary hover:underline transition-colors font-medium cursor-pointer"
+            >
+              Kebijakan Privasi
+            </button>
+          </div>
         </div>
+
+        {/* Live Walkthrough & Manual Documentation */}
+        <WalkthroughTrigger config={REGISTER_WALKTHROUGH} position="top-right" label="Panduan Daftar" />
+
+        {/* Modal Kebijakan Privasi */}
+        <PrivacyPolicyModal
+          isOpen={isPrivacyModalOpen}
+          onClose={() => setIsPrivacyModalOpen(false)}
+        />
       </div>
     </div>
   );

@@ -294,6 +294,7 @@ export async function updateProfile(payload: {
   birthDate?: string;
   whatsappNumber?: string;
   city?: string;
+  province?: string;
   currentAddress?: string;
   occupation?: string;
   company?: string;
@@ -408,4 +409,16 @@ export async function changePassword(payload: {
     setAccessToken(res.token);
   }
   return res;
+}
+
+/**
+ * Request password reset link to registered email
+ */
+export async function requestPasswordReset(email: string, recaptchaToken?: string) {
+  const platform = getPlatformIdentifier();
+  return await apiClient.post('/auth/forgot-password', {
+    email: email.trim(),
+    recaptchaToken,
+    platform,
+  });
 }

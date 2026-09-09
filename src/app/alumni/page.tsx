@@ -8,8 +8,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { fetchProfiles } from '@/services/authService';
 import { fetchDeceasedAlumni } from '@/services/memorialService';
 import { AlumniProfile, DeceasedAlumni } from '@/types';
-import { Search, Users, Sparkles, Heart, Flame, Plus, UserPlus } from 'lucide-react';
+import { Search, Users, Sparkles, Heart, Flame, Plus, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+
+const ITEMS_PER_PAGE = 10;
 
 const CLASS_FILTERS = [
   'Semua',
@@ -31,6 +33,12 @@ export default function AlumniDirectoryPage() {
   const [selectedClass, setSelectedClass] = useState<string>('Semua');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
+  // Reset pagination on filter or tab change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedClass, activeTab]);
 
   useEffect(() => {
     loadData();
@@ -52,37 +60,81 @@ export default function AlumniDirectoryPage() {
     }
   };
 
-  // Filter regular alumni profiles
-  const filteredProfiles = profiles.filter((p) => {
-    const matchesClass =
-      selectedClass === 'Semua' || p.className?.toLowerCase() === selectedClass.toLowerCase();
+  // Filter regular alumni profiles & sort alphabetically (A - Z) by fullName
+  const filteredProfiles = profiles
+    .filter((p) => {
+      const matchesClass =
+        selectedClass === 'Semua' || p.className?.toLowerCase() === selectedClass.toLowerCase();
 
-    if (!searchQuery.trim()) return matchesClass;
+      if (!searchQuery.trim()) return matchesClass;
 
-    const query = searchQuery.toLowerCase();
-    const matchesName = p.fullName?.toLowerCase().includes(query);
-    const matchesNickname = p.nickname?.toLowerCase().includes(query);
-    const matchesOccupation = p.occupation?.toLowerCase().includes(query);
-    const matchesCity = p.city?.toLowerCase().includes(query);
+      const query = searchQuery.toLowerCase();
+      const matchesName = p.fullName?.toLowerCase().includes(query);
+      const matchesNickname = p.nickname?.toLowerCase().includes(query);
+      const matchesOccupation = p.occupation?.toLowerCase().includes(query);
+      const matchesCity = p.city?.toLowerCase().includes(query);
 
-    return matchesClass && (matchesName || matchesNickname || matchesOccupation || matchesCity);
-  });
+      return matchesClass && (matchesName || matchesNickname || matchesOccupation || matchesCity);
+    })
+    .sort((a, b) => {
+      const nameA = (a.fullName || '').trim();
+      const nameB = (b.fullName || '').trim();
+      return nameA.localeCompare(nameB, 'id', { sensitivity: 'base' });
+    });
 
-  // Filter deceased alumni
-  const filteredDeceased = deceasedList.filter((d) => {
-    const matchesClass =
-      selectedClass === 'Semua' || d.className?.toLowerCase() === selectedClass.toLowerCase();
+  // Filter deceased alumni & sort alphabetically (A - Z) by fullName
+  const filteredDeceased = deceasedList
+    .filter((d) => {
+      const matchesClass =
+        selectedClass === 'Semua' || d.className?.toLowerCase() === selectedClass.toLowerCase();
 
-    if (!searchQuery.trim()) return matchesClass;
+      if (!searchQuery.trim()) return matchesClass;
 
-    const query = searchQuery.toLowerCase();
-    const matchesName = d.fullName?.toLowerCase().includes(query);
-    const matchesNickname = d.nickname?.toLowerCase().includes(query);
-    const matchesBio = d.bio?.toLowerCase().includes(query);
-    const matchesYear = d.passedAwayYear?.toString().includes(query);
+      const query = searchQuery.toLowerCase();
+      const matchesName = d.fullName?.toLowerCase().includes(query);
+      const matchesNickname = d.nickname?.toLowerCase().includes(query);
+      const matchesBio = d.bio?.toLowerCase().includes(query);
+      const matchesYear = d.passedAwayYear?.toString().includes(query);
 
-    return matchesClass && (matchesName || matchesNickname || matchesBio || matchesYear);
-  });
+      return matchesClass && (matchesName || matchesNickname || matchesBio || matchesYear);
+    })
+    .sort((a, b) => {
+      const nameA = (a.fullName || '').trim();
+      const nameB = (b.fullName || '').trim();
+      return nameA.localeCompare(nameB, 'id', { sensitivity: 'base' });
+    });
+
+  // Pagination Calculation per 10 items
+  const isDirectory = activeTab === 'directory';
+  const currentList = isDirectory ? filteredProfiles : filteredDeceased;
+  const totalCount = currentList.length;
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1;
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalCount);
+
+  const paginatedProfiles = filteredProfiles.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedDeceased = filteredDeceased.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+    }
+  };
+
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  };
 
   return (
     <div className="w-full px-3 py-3 space-y-3.5 pb-16">
@@ -239,10 +291,84 @@ export default function AlumniDirectoryPage() {
             }}
           />
         ) : (
-          <div className="space-y-2.5">
-            {filteredProfiles.map((alumni) => (
-              <AlumniCard key={alumni.uid || alumni.id} alumni={alumni} />
-            ))}
+          <div className="space-y-3">
+            {/* Header info bar */}
+            <div className="flex items-center justify-between text-xs text-slate-500 px-1 pt-1">
+              <span className="font-medium">
+                Urut Abjad A-Z &bull; {filteredProfiles.length} alumni ditemukan
+                {selectedClass !== 'Semua' && ` (Kelas ${selectedClass})`}
+              </span>
+              {totalCount > 0 && (
+                <span className="font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                  Hal. {currentPage} / {totalPages}
+                </span>
+              )}
+            </div>
+
+            {/* List 10 Cards */}
+            <div className="space-y-2.5">
+              {paginatedProfiles.map((alumni) => (
+                <AlumniCard key={alumni.uid || alumni.id} alumni={alumni} />
+              ))}
+            </div>
+
+            {/* Pagination Controls (Always visible when there is data) */}
+            {totalCount > 0 && (
+              <div className="bg-white rounded-2xl p-3 border border-slate-100 shadow-subtle flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
+                <div className="text-xs text-slate-500 font-medium text-center sm:text-left">
+                  Menampilkan <span className="font-bold text-slate-800">{startIndex + 1}</span> -{' '}
+                  <span className="font-bold text-slate-800">{endIndex}</span> dari{' '}
+                  <span className="font-bold text-slate-800">{totalCount}</span> alumni
+                  {selectedClass !== 'Semua' && (
+                    <span className="text-brand-primary font-semibold"> ({selectedClass})</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                    title="Halaman Sebelumnya"
+                  >
+                    <ChevronLeft size={15} />
+                    <span className="hidden sm:inline">Sebelumnya</span>
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {getPageNumbers().map((page, idx) =>
+                      typeof page === 'number' ? (
+                        <button
+                          key={idx}
+                          onClick={() => handlePageChange(page)}
+                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            currentPage === page
+                              ? 'bg-brand-primary text-white shadow-xs'
+                              : 'text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ) : (
+                        <span key={idx} className="px-1 text-slate-400 text-xs font-bold select-none">
+                          ...
+                        </span>
+                      )
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                    title="Halaman Selanjutnya"
+                  >
+                    <span className="hidden sm:inline">Selanjutnya</span>
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )
       ) : (
@@ -265,23 +391,97 @@ export default function AlumniDirectoryPage() {
             </button>
           </div>
         ) : (
-          <div className="space-y-3.5">
-            {filteredDeceased.map((item) => (
-              <MemorialCard
-                key={item.id}
-                deceased={item}
-                onFlowerGiven={(id, count) => {
-                  setDeceasedList((prev) =>
-                    prev.map((d) =>
-                      d.id === id ? { ...d, flowerCount: count, hasGivenFlower: true } : d
-                    )
-                  );
-                }}
-                onDeleted={(id) => {
-                  setDeceasedList((prev) => prev.filter((d) => d.id !== id));
-                }}
-              />
-            ))}
+          <div className="space-y-3">
+            {/* Header info bar */}
+            <div className="flex items-center justify-between text-xs text-slate-400 px-1 pt-1">
+              <span className="font-medium">
+                Urut Abjad A-Z &bull; {filteredDeceased.length} sahabat dikenang
+                {selectedClass !== 'Semua' && ` (Kelas ${selectedClass})`}
+              </span>
+              {totalCount > 0 && (
+                <span className="font-semibold text-amber-300 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
+                  Hal. {currentPage} / {totalPages}
+                </span>
+              )}
+            </div>
+
+            {/* List 10 Cards */}
+            <div className="space-y-3.5">
+              {paginatedDeceased.map((item) => (
+                <MemorialCard
+                  key={item.id}
+                  deceased={item}
+                  onFlowerGiven={(id, count) => {
+                    setDeceasedList((prev) =>
+                      prev.map((d) =>
+                        d.id === id ? { ...d, flowerCount: count, hasGivenFlower: true } : d
+                      )
+                    );
+                  }}
+                  onDeleted={(id) => {
+                    setDeceasedList((prev) => prev.filter((d) => d.id !== id));
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Pagination Controls (Always visible when there is data) */}
+            {totalCount > 0 && (
+              <div className="bg-slate-900 rounded-2xl p-3 border border-slate-800 shadow-subtle flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 text-slate-200">
+                <div className="text-xs text-slate-400 font-medium text-center sm:text-left">
+                  Menampilkan <span className="font-bold text-amber-300">{startIndex + 1}</span> -{' '}
+                  <span className="font-bold text-amber-300">{endIndex}</span> dari{' '}
+                  <span className="font-bold text-amber-300">{totalCount}</span> sahabat
+                  {selectedClass !== 'Semua' && (
+                    <span className="text-amber-400 font-semibold"> ({selectedClass})</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                    title="Halaman Sebelumnya"
+                  >
+                    <ChevronLeft size={15} />
+                    <span className="hidden sm:inline">Sebelumnya</span>
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {getPageNumbers().map((page, idx) =>
+                      typeof page === 'number' ? (
+                        <button
+                          key={idx}
+                          onClick={() => handlePageChange(page)}
+                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            currentPage === page
+                              ? 'bg-amber-500 text-slate-950 shadow-xs'
+                              : 'text-slate-300 hover:bg-slate-800 border border-slate-700'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ) : (
+                        <span key={idx} className="px-1 text-slate-500 text-xs font-bold select-none">
+                          ...
+                        </span>
+                      )
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1 cursor-pointer"
+                    title="Halaman Selanjutnya"
+                  >
+                    <span className="hidden sm:inline">Selanjutnya</span>
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )
       )}

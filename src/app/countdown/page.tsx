@@ -148,7 +148,7 @@ export default function CountdownPage() {
             {/* Slogan Forsil 99 */}
             <div className="mt-8 sm:mt-10 max-w-lg space-y-2 animate-fade-in">
               <p className="text-xs sm:text-sm text-slate-300/90 font-medium tracking-wide">
-                &ldquo;Satu Sekolah Satu Angkatan Untuk Tetap Terhubung&rdquo;
+                &ldquo;Satu Angkatan, Solid, Nyata Terhubung&rdquo;
               </p>
               <p className="text-[11px] text-slate-400 font-rajdhani tracking-wider uppercase">
                 Menghubungkan kembali kenangan, persahabatan, dan kolaborasi alumni SMA Negeri 59 Jakarta.

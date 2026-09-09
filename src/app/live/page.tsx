@@ -66,7 +66,6 @@ export default function RadarAlumniPage() {
   const markersLayerRef = useRef<any>(null);
   const userCircleRef = useRef<any>(null);
   const userMarkerRef = useRef<any>(null);
-  const schoolMarkerRef = useRef<any>(null);
   const leafletLibRef = useRef<any>(null);
 
   // 1. Subscribe to Live Locations from Firebase Realtime Database
@@ -117,12 +116,24 @@ export default function RadarAlumniPage() {
           zoomControl: false,
         });
 
-        // Add High-DPI CartoDB Positron clean modern tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-          maxZoom: 19,
-          subdomains: 'abcd',
-        }).addTo(map);
+        // Add High-DPI MapTiler Voyager clean modern tiles with API Key
+        const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY || 'jEhY1KZxFtXJuU5n3Ayc';
+        const tileLayer = L.tileLayer(
+          `https://api.maptiler.com/maps/voyager/256/{z}/{x}/{y}{r}.png?key=${maptilerKey}`,
+          {
+            attribution:
+              '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+            maxZoom: 19,
+          }
+        ).addTo(map);
+
+        // Graceful fallback to standard OSM tile if MapTiler tile fails
+        tileLayer.on('tileerror', (error: any) => {
+          if (error.tile && !error.tile.src.includes('tile.openstreetmap.org')) {
+            const coords = error.coords;
+            error.tile.src = `https://tile.openstreetmap.org/${coords.z}/${coords.x}/${coords.y}.png`;
+          }
+        });
 
         // Zoom control on top right
         L.control.zoom({ position: 'topright' }).addTo(map);
@@ -131,26 +142,7 @@ export default function RadarAlumniPage() {
         const markersGroup = L.layerGroup().addTo(map);
         markersLayerRef.current = markersGroup;
 
-        // Add Landmark SMAN 59 Jakarta
-        const schoolIcon = L.divIcon({
-          className: 'custom-school-pin',
-          html: `
-            <div style="position: relative; display: flex; flex-direction: column; items: center; cursor: pointer; transform: translate(-50%, -100%);">
-              <div style="background: linear-gradient(135deg, #F59E0B, #D97706); color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 800; box-shadow: 0 4px 12px rgba(217,119,6,0.4); display: flex; align-items: center; gap: 4px; white-space: nowrap; border: 2px solid white;">
-                <span>🏫 SMAN 59</span>
-              </div>
-              <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid #D97706; margin: 0 auto;"></div>
-            </div>
-          `,
-          iconSize: [0, 0],
-          iconAnchor: [0, 0],
-        });
-
-        const schoolMarker = L.marker([SMAN_59_COORDS.lat, SMAN_59_COORDS.lng], { icon: schoolIcon }).addTo(map);
-        schoolMarker.on('click', () => {
-          toast.info('🏫 SMAN 59 Jakarta — Pusat Forum Silaturahmi Angkatan 1999');
-        });
-        schoolMarkerRef.current = schoolMarker;
+        // Landmark SMAN 59 marker removed as requested to avoid confusion
 
         mapInstanceRef.current = map;
         setMapReady(true);

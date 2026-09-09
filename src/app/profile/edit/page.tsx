@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { updateProfile } from '@/services/authService';
+import { compressImage } from '@/utils/imageCompressor';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
 import { AppAvatar } from '@/components/ui/AppAvatar';
+import { CoverCropModal } from '@/components/ui/CoverCropModal';
 import {
   ChevronLeft,
   Camera,
@@ -86,8 +88,95 @@ export default function EditProfilePage() {
   // Contact & Location
   const initialWa = profile?.whatsappNumber || user?.phoneNumber || '';
   const [whatsappNumber, setWhatsappNumber] = useState<string>(initialWa);
-  const [city, setCity] = useState<string>(profile?.city || 'Jakarta');
+  const [city, setCity] = useState<string>(profile?.city || '');
+  const [province, setProvince] = useState<string>(profile?.province || '');
   const [currentAddress, setCurrentAddress] = useState<string>(profile?.currentAddress || '');
+
+  const inferProvince = (cityName: string): string | null => {
+    const lower = cityName.toLowerCase();
+    if (
+      lower.includes('bogor') ||
+      lower.includes('depok') ||
+      lower.includes('bekasi') ||
+      lower.includes('cibinong') ||
+      lower.includes('cikarang') ||
+      lower.includes('bandung') ||
+      lower.includes('karawang') ||
+      lower.includes('sukabumi') ||
+      lower.includes('cirebon') ||
+      lower.includes('tasikmalaya')
+    ) {
+      return 'Jawa Barat';
+    }
+    if (
+      lower.includes('jakarta') ||
+      lower.includes('jaktim') ||
+      lower.includes('jaksel') ||
+      lower.includes('jakpus') ||
+      lower.includes('jakbar') ||
+      lower.includes('jakut')
+    ) {
+      return 'DKI Jakarta';
+    }
+    if (
+      lower.includes('tangerang') ||
+      lower.includes('tangsel') ||
+      lower.includes('serang') ||
+      lower.includes('cilegon') ||
+      lower.includes('bsd') ||
+      lower.includes('bintaro')
+    ) {
+      return 'Banten';
+    }
+    if (
+      lower.includes('semarang') ||
+      lower.includes('solo') ||
+      lower.includes('surakarta') ||
+      lower.includes('magelang') ||
+      lower.includes('banyumas') ||
+      lower.includes('purwokerto')
+    ) {
+      return 'Jawa Tengah';
+    }
+    if (
+      lower.includes('jogja') ||
+      lower.includes('yogyakarta') ||
+      lower.includes('sleman') ||
+      lower.includes('bantul')
+    ) {
+      return 'DI Yogyakarta';
+    }
+    if (
+      lower.includes('surabaya') ||
+      lower.includes('malang') ||
+      lower.includes('sidoarjo') ||
+      lower.includes('gresik')
+    ) {
+      return 'Jawa Timur';
+    }
+    return null;
+  };
+
+  const handleCityChange = (val: string) => {
+    setCity(val);
+    const inferred = inferProvince(val);
+    if (inferred) {
+      setProvince(inferred);
+    }
+  };
+
+  // Sync profile when loaded
+  useEffect(() => {
+    if (profile) {
+      if (profile.city && !city) setCity(profile.city);
+      if (profile.province) {
+        setProvince(profile.province);
+      } else if (profile.city) {
+        const inf = inferProvince(profile.city);
+        if (inf) setProvince(inf);
+      }
+    }
+  }, [profile]);
 
   // Career
   const isKnownProf = STANDARD_PROFESSIONS.includes(profile?.occupation || '');
@@ -113,6 +202,10 @@ export default function EditProfilePage() {
 
   // Photo
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string>(profile?.profilePhotoUrl || '');
+  const [coverPhotoUrl, setCoverPhotoUrl] = useState<string>(profile?.coverPhotoUrl || '');
+  const [isCropModalOpen, setIsCropModalOpen] = useState<boolean>(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Privacy Policy Agreement
@@ -129,11 +222,52 @@ export default function EditProfilePage() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type || !file.type.startsWith('image/')) {
+      toast.error('File yang dipilih bukan gambar. Harap pilih gambar (JPG, PNG, WebP).');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       setProfilePhotoUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type || !file.type.startsWith('image/')) {
+      toast.error('File yang dipilih bukan gambar. Harap pilih file gambar (JPG, PNG, WebP).');
+      if (coverInputRef.current) coverInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('Ukuran foto terlalu besar. Maksimal 25MB.');
+      if (coverInputRef.current) coverInputRef.current.value = '';
+      return;
+    }
+
+    // Baca file asli untuk dipotong langsung oleh user tanpa mengubah resolusi
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImageSrc(reader.result as string);
+      setIsCropModalOpen(true);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    };
+    reader.onerror = () => {
+      toast.error('Gagal membaca file foto.');
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = (croppedDataUrl: string) => {
+    setCoverPhotoUrl(croppedDataUrl);
+    setCropImageSrc(null);
+    if (coverInputRef.current) coverInputRef.current.value = '';
+    toast.success('Foto cover berhasil dipotong sesuai ukuran cover! Klik Simpan Perubahan Profil di bawah untuk menyimpan.');
   };
 
   const handleToggleHobby = (hobbyName: string) => {
@@ -216,6 +350,7 @@ export default function EditProfilePage() {
         birthDate: birthDate || undefined,
         whatsappNumber: whatsappNumber.trim() || undefined,
         city: city.trim() || undefined,
+        province: province.trim() || undefined,
         currentAddress: currentAddress.trim() || undefined,
         occupation: finalOccupation,
         company: company.trim() || undefined,
@@ -227,6 +362,7 @@ export default function EditProfilePage() {
           : 'introv',
         tempPublicHours: tempPublicHours !== '0' ? parseInt(tempPublicHours, 10) : 0,
         profilePhotoUrl: profilePhotoUrl || undefined,
+        coverPhotoUrl: coverPhotoUrl || undefined,
       });
 
       if (updated) {
@@ -344,18 +480,54 @@ export default function EditProfilePage() {
           )}
         </div>
 
-        {/* Card 1: Foto Profil */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col items-center justify-center">
-          <div className="relative group">
-            <AppAvatar src={profilePhotoUrl} name={fullName || 'Saya'} size="xl" />
-            <label className="absolute bottom-0 right-0 p-2 bg-brand-primary text-white rounded-full cursor-pointer hover:bg-blue-700 shadow-md transition-transform hover:scale-105">
-              <Camera size={16} />
-              <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+        {/* Card 1: Foto Profil & Cover */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          {/* Cover Photo Preview & Edit Button */}
+          <div className="relative w-full h-36 sm:h-44 bg-gradient-to-r from-brand-primary to-brand-primaryDeep overflow-hidden group">
+            {coverPhotoUrl ? (
+              <img
+                src={coverPhotoUrl}
+                alt="Cover Preview"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center opacity-20 text-white font-black text-3xl select-none">
+                SMAN 59 JAKARTA ’99
+              </div>
+            )}
+
+            {/* Tombol Ubah Cover di Bagian Kanan Bawah Foto Cover */}
+            <label className="absolute bottom-3 right-3 px-3.5 py-1.5 rounded-xl bg-black/65 hover:bg-black/85 backdrop-blur-md text-white text-xs font-semibold flex items-center gap-1.5 shadow-md border border-white/20 cursor-pointer transition-all hover:scale-105 active:scale-95">
+              <Camera size={14} />
+              <span>Ubah Cover</span>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCoverUpload}
+                className="hidden"
+              />
             </label>
           </div>
-          <span className="text-xs text-slate-500 mt-2.5 font-medium">
-            Ketuk ikon kamera untuk mengganti foto profil
-          </span>
+
+          {/* Avatar Section Overlapping Cover */}
+          <div className="px-5 pb-5 flex flex-col items-center justify-center -mt-12 relative z-10">
+            <div className="relative group p-1 bg-white rounded-full shadow-md">
+              <AppAvatar src={profilePhotoUrl} name={fullName || 'Saya'} size="xl" />
+              <label className="absolute bottom-0 right-0 p-2 bg-brand-primary text-white rounded-full cursor-pointer hover:bg-blue-700 shadow-md transition-transform hover:scale-105" title="Ganti Foto Profil">
+                <Camera size={16} />
+                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+              </label>
+            </div>
+            <div className="text-center mt-2">
+              <span className="text-xs text-slate-500 font-medium block">
+                Ketuk ikon kamera untuk mengganti foto profil
+              </span>
+              <span className="text-[11px] text-slate-400 font-normal">
+                Gunakan tombol di kanan bawah cover untuk mengganti foto cover
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Card 2: Pengaturan Kategori & Keterbukaan Profil */}
@@ -598,7 +770,7 @@ export default function EditProfilePage() {
             <h2 className="text-sm font-bold text-slate-900">Kontak & Alamat Domisili</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
             <AppInput
               label="Nomor WhatsApp"
               value={whatsappNumber}
@@ -607,14 +779,54 @@ export default function EditProfilePage() {
               leftIcon={<Phone size={16} />}
               helperText="Otomatis dihubungkan ke tombol chat WA profil Anda"
             />
+          </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <AppInput
               label="Kota / Kabupaten Domisili"
               value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="Contoh: Jakarta Timur, Bekasi, Bandung"
+              onChange={(e) => handleCityChange(e.target.value)}
+              placeholder="Contoh: Kabupaten Bogor, Jakarta Timur, Bandung"
               leftIcon={<MapPin size={16} />}
             />
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                Provinsi Domisili
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  list="province-options"
+                  value={province}
+                  onChange={(e) => setProvince(e.target.value)}
+                  placeholder="Contoh: Jawa Barat, DKI Jakarta, Banten"
+                  className="w-full p-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-brand-primary focus:outline-none"
+                />
+                <datalist id="province-options">
+                  <option value="DKI Jakarta" />
+                  <option value="Jawa Barat" />
+                  <option value="Banten" />
+                  <option value="Jawa Tengah" />
+                  <option value="DI Yogyakarta" />
+                  <option value="Jawa Timur" />
+                  <option value="Bali" />
+                  <option value="Sumatera Utara" />
+                  <option value="Sumatera Barat" />
+                  <option value="Riau" />
+                  <option value="Kepulauan Riau" />
+                  <option value="Lampung" />
+                  <option value="Sumatera Selatan" />
+                  <option value="Kalimantan Timur" />
+                  <option value="Kalimantan Barat" />
+                  <option value="Sulawesi Selatan" />
+                  <option value="Luar Negeri" />
+                </datalist>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
+                Otomatis disesuaikan jika mengetik kota/kabupaten.
+              </p>
+            </div>
           </div>
 
           <div>
@@ -846,6 +1058,20 @@ export default function EditProfilePage() {
         isOpen={isPrivacyModalOpen}
         onClose={() => setIsPrivacyModalOpen(false)}
         onAccept={() => setHasAgreedPrivacy(true)}
+      />
+
+      {/* Cover Crop Modal */}
+      <CoverCropModal
+        isOpen={isCropModalOpen}
+        imageSrc={cropImageSrc}
+        onClose={() => {
+          setIsCropModalOpen(false);
+          setCropImageSrc(null);
+          if (coverInputRef.current) coverInputRef.current.value = '';
+        }}
+        onCropComplete={handleCropComplete}
+        aspectRatio={2.5}
+        title="Sesuaikan Area Potong Cover Profil"
       />
     </div>
   );

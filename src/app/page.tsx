@@ -10,6 +10,8 @@ import { Post } from '@/types';
 import { Sparkles, RefreshCw, MessageSquareDashed } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
+import { WalkthroughTrigger } from '@/components/walkthrough/WalkthroughTrigger';
+import { HOME_WALKTHROUGH } from '@/config/walkthroughData';
 
 const FILTER_TABS = [
   { id: 'all', label: 'Semua' },
@@ -123,6 +125,9 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* Live Walkthrough & Manual Documentation */}
+      <WalkthroughTrigger config={HOME_WALKTHROUGH} position="bottom-right" label="Panduan" />
     </div>
   );
 }

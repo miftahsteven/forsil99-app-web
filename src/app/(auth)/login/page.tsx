@@ -7,9 +7,11 @@ import { useAuth } from '@/context/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
 import { executeRecaptchaV3, loadRecaptchaV3Script } from '@/utils/recaptcha';
-import { Lock, Smartphone, Eye, EyeOff, Sparkles, ShieldCheck, Timer } from 'lucide-react';
+import { Lock, Smartphone, Eye, EyeOff, Sparkles, ShieldCheck, Timer, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useReleaseDate } from '@/hooks/useReleaseDate';
+import { WalkthroughTrigger } from '@/components/walkthrough/WalkthroughTrigger';
+import { LOGIN_WALKTHROUGH } from '@/config/walkthroughData';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -165,8 +167,20 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col justify-between p-5 bg-gradient-to-b from-blue-50/50 via-white to-slate-50">
       <div className="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center">
+        {/* Top Navigation Bar with Menu Tentang Forsil 99 */}
+        <div className="flex items-center justify-between pb-3">
+          <span className="text-xs font-extrabold text-slate-400 tracking-wider">FORSIL 99</span>
+          <Link
+            href="/about"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-slate-200/90 text-xs font-bold text-brand-primary hover:border-brand-primary hover:bg-blue-50/40 shadow-2xs transition-all active:scale-95"
+          >
+            <span>Tentang Forsil 99</span>
+            <ChevronRight size={13} className="text-brand-primary" />
+          </Link>
+        </div>
+
         {/* Logo & Brand Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-5">
           <div className="flex justify-center mb-3">
             <img
               src="/images/forsil99apps.png"
@@ -183,6 +197,36 @@ export default function LoginPage() {
             <span>Khusus Angkatan 1999 </span>
           </div>
         </div>
+
+        {/* Menu Tentang Forsil 99 (Membangun Kepercayaan Alumni) */}
+        <Link
+          href="/about"
+          className="mb-5 block group bg-gradient-to-r from-blue-50/95 via-indigo-50/80 to-amber-50/70 hover:from-blue-100/90 hover:to-indigo-100/80 border border-blue-200/80 hover:border-blue-300 rounded-2xl p-3.5 transition-all duration-200 shadow-xs hover:shadow-md"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white shadow-xs border border-blue-200/70 flex items-center justify-center text-brand-primary flex-shrink-0 group-hover:scale-105 transition-transform">
+                <Sparkles size={18} className="text-amber-500" />
+              </div>
+              <div className="text-left">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-brand-primary transition-colors">
+                    Tentang Forsil 99
+                  </span>
+                  <span className="text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200/80 px-2 py-0.5 rounded-full">
+                    Sambutan Ketua
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                  Kenali wadah silaturahmi & sambutan resmi Ketua sebelum masuk
+                </p>
+              </div>
+            </div>
+            <div className="flex-shrink-0 text-slate-400 group-hover:text-brand-primary group-hover:translate-x-0.5 transition-all">
+              <ChevronRight size={18} />
+            </div>
+          </div>
+        </Link>
 
         {/* Lockout Countdown Alert Card */}
         {lockoutSeconds > 0 && (
@@ -204,7 +248,7 @@ export default function LoginPage() {
         )}
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-card space-y-4">
+        <form id="login-form-box" onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-card space-y-4">
           <AppInput
             label="Nomor WhatsApp / Email"
             placeholder="Contoh: 08123456789 atau email@domain.com"
@@ -241,7 +285,7 @@ export default function LoginPage() {
             <div className="flex justify-end mt-1.5">
               <Link
                 href="/change-password"
-                className="text-[11px] text-brand-primary hover:underline font-semibold"
+                className="text-[11px] text-brand-primary hover:underline font-semibold cursor-pointer"
               >
                 Lupa atau Ingin Ganti Kata Sandi?
               </Link>
@@ -280,9 +324,21 @@ export default function LoginPage() {
       </div>
 
       {/* Footer info */}
-      <footer className="text-center text-[10px] text-slate-400 pt-6">
-        © 2026 FORSIL 99 SMAN 59 Jakarta. Satu Sekolah. Semua Angkatan. Tetap Terhubung.
+      <footer className="text-center text-[10px] text-slate-400 pt-6 space-y-1.5">
+        <div className="flex items-center justify-center gap-3 text-[11px] text-slate-500">
+          <Link href="/about" className="hover:text-brand-primary hover:underline transition-colors font-medium">
+            Tentang Forsil 99
+          </Link>
+          <span>•</span>
+          <Link href="/privacy" className="hover:text-brand-primary hover:underline transition-colors font-medium">
+            Kebijakan Privasi
+          </Link>
+        </div>
+        <p>© 2026 FORSIL 99 SMAN 59 Jakarta. Satu Angkatan, Solid, Nyata Terhubung.</p>
       </footer>
+
+      {/* Live Walkthrough & Manual Documentation */}
+      <WalkthroughTrigger config={LOGIN_WALKTHROUGH} position="top-right" label="Panduan Masuk" />
     </div>
   );
 }

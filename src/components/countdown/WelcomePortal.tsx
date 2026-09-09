@@ -84,12 +84,8 @@ export const WelcomePortal: React.FC<WelcomePortalProps> = ({ onProceedToLogin, 
       </h1>
 
       {/* Tagline Pill Forsil99 */}
-      <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-950/60 border border-sky-500/30 text-sky-300 text-xs font-rajdhani font-semibold tracking-wider uppercase mb-8">
-        <span>Satu Sekolah</span>
-        <span>•</span>
-        <span>Satu Angkatan</span>
-        <span>•</span>
-        <span>Untuk Tetap Terhubung</span>
+      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-950/60 border border-sky-500/30 text-sky-300 text-xs font-rajdhani font-semibold tracking-wider uppercase mb-8">
+        <span>Satu Angkatan, Solid, Nyata Terhubung</span>
       </div>
 
       {/* Tombol Utama & Progress Bar 15 Detik */}

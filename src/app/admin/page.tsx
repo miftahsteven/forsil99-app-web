@@ -358,6 +358,15 @@ export default function AdminVerificationPage() {
               <AlertTriangle size={14} />
               <span>Laporan Konten ({reports.length})</span>
             </button>
+
+            <Link
+              href="/events"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50 shadow-xs"
+              title="Kelola Agenda & Reuni Alumni"
+            >
+              <Calendar size={14} className="text-indigo-600" />
+              <span>Agenda & Reuni Alumni ↗</span>
+            </Link>
           </>
         )}
       </div>

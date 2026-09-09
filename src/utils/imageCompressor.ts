@@ -129,13 +129,39 @@ export async function compressImage(
   });
 }
 
+export const MAX_POST_IMAGES = 5;
+export const MAX_IMAGE_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+
 /**
  * Process a batch of post image files, applying the adaptive compression rule
+ * and enforcing community policies:
+ * - Maximum 5 images per post
+ * - Maximum 100 MB per file
  */
 export async function processPostImageFiles(
   files: File[],
   existingCount: number = 0
 ): Promise<Array<{ type: 'image' | 'video'; url: string }>> {
+  if (existingCount >= MAX_POST_IMAGES) {
+    throw new Error('Batas maksimal 5 foto per postingan telah tercapai sesuai kebijakan Forsil 99.');
+  }
+
+  if (files.length + existingCount > MAX_POST_IMAGES) {
+    const remaining = MAX_POST_IMAGES - existingCount;
+    throw new Error(
+      `Sesuai kebijakan Forsil 99, 1 postingan maksimal 5 foto. Anda hanya dapat menambahkan ${remaining} foto lagi.`
+    );
+  }
+
+  for (const file of files) {
+    if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      throw new Error(
+        `Foto "${file.name}" (${sizeMB} MB) melebihi batas kebijakan maksimal 100 MB per foto.`
+      );
+    }
+  }
+
   const totalCount = files.length + existingCount;
   const results: Array<{ type: 'image' | 'video'; url: string }> = [];
 
@@ -156,3 +182,4 @@ export async function processPostImageFiles(
 
   return results;
 }
+

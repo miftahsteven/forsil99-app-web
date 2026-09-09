@@ -6,7 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 
 export const metadata: Metadata = {
   title: 'Forsil99 — Rumah Digital Alumni SMAN 59 Jakarta',
-  description: 'Satu Sekolah. Semua Angkatan. Tetap Terhubung. Media sosial dan rumah digital alumni SMA Negeri 59 Jakarta Angkatan 1999.',
+  description: 'Satu Angkatan, Solid, Nyata Terhubung. Media sosial dan rumah digital alumni SMA Negeri 59 Jakarta Angkatan 1999.',
   icons: {
     icon: '/images/forsil99apps.png',
     apple: '/images/forsil99apps.png',

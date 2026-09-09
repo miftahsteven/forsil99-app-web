@@ -104,3 +104,7 @@ export async function createStory(payload: {
 }): Promise<any> {
   return await apiClient.post('/stories', payload);
 }
+
+export async function deleteStory(storyId: string): Promise<any> {
+  return await apiClient.delete(`/stories/${storyId}`);
+}

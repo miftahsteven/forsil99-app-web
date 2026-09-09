@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { fetchProfileById, toggleFollow, fetchFollowStatus } from '@/services/authService';
+import { fetchProfileById, toggleFollow, fetchFollowStatus, updateProfile } from '@/services/authService';
+import { compressImage } from '@/utils/imageCompressor';
 import { fetchPosts } from '@/services/postService';
 import { fetchProducts, fetchShops } from '@/services/shopService';
 import { AlumniProfile, Post, Product, Shop } from '@/types';
@@ -17,6 +18,8 @@ import { ProductCard } from '@/components/shop/ProductCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FollowListModal } from '@/components/profile/FollowListModal';
 import { SellerRegistrationModal } from '@/components/shop/SellerRegistrationModal';
+import { ImageViewModal } from '@/components/ui/ImageViewModal';
+import { CoverCropModal } from '@/components/ui/CoverCropModal';
 import {
   MapPin,
   Briefcase,
@@ -52,6 +55,9 @@ import {
   BadgeCheck,
   Store,
   ShoppingBag,
+  Camera,
+  Loader2,
+  Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -83,6 +89,49 @@ const calculateAge = (birthDateStr?: string) => {
   }
 };
 
+const formatLocation = (city?: string | null, province?: string | null) => {
+  const cleanCity = city?.trim();
+  let cleanProvince = province?.trim();
+
+  if (!cleanCity && !cleanProvince) {
+    return 'Belum diisi';
+  }
+
+  // Auto-correct obvious mismatch from seed residue
+  if (cleanCity && cleanProvince === 'DKI Jakarta') {
+    const lower = cleanCity.toLowerCase();
+    if (
+      lower.includes('bogor') ||
+      lower.includes('depok') ||
+      lower.includes('bekasi') ||
+      lower.includes('cibinong') ||
+      lower.includes('cikarang') ||
+      lower.includes('bandung') ||
+      lower.includes('karawang')
+    ) {
+      cleanProvince = 'Jawa Barat';
+    } else if (
+      lower.includes('tangerang') ||
+      lower.includes('tangsel') ||
+      lower.includes('serang') ||
+      lower.includes('cilegon') ||
+      lower.includes('bsd') ||
+      lower.includes('bintaro')
+    ) {
+      cleanProvince = 'Banten';
+    }
+  }
+
+  if (cleanCity && cleanProvince) {
+    if (cleanCity.toLowerCase().includes(cleanProvince.toLowerCase())) {
+      return cleanCity;
+    }
+    return `${cleanCity} • ${cleanProvince}`;
+  }
+
+  return cleanCity || cleanProvince || 'Belum diisi';
+};
+
 const getWhatsAppUrl = (phone?: string) => {
   if (!phone) return '#';
   let clean = phone.replace(/\D/g, '');
@@ -97,7 +146,7 @@ export default function ProfileDetailPage() {
   const router = useRouter();
   const rawId = params.id as string;
 
-  const { user, profile: myProfile, logout, isAuthenticated } = useAuth();
+  const { user, profile: myProfile, logout, isAuthenticated, updateCurrentProfileState } = useAuth();
   const targetId = rawId === 'me' ? user?.id || myProfile?.uid || '' : rawId;
 
   const [profile, setProfile] = useState<AlumniProfile | null>(null);
@@ -117,12 +166,106 @@ export default function ProfileDetailPage() {
   const [isFollowModalOpen, setIsFollowModalOpen] = useState<boolean>(false);
   const [followModalTab, setFollowModalTab] = useState<'followers' | 'following'>('followers');
   const [isSellerModalOpen, setIsSellerModalOpen] = useState<boolean>(false);
+  const [isUploadingCover, setIsUploadingCover] = useState<boolean>(false);
+  const [isCropModalOpen, setIsCropModalOpen] = useState<boolean>(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ src: string; title: string; subtitle?: string } | null>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const isMe =
     Boolean(user?.id && (user.id === targetId || user.id === profile?.userId || user.id === profile?.id)) ||
     Boolean(myProfile?.uid && (myProfile.uid === targetId || myProfile.uid === profile?.userId || myProfile.uid === profile?.id)) ||
     Boolean(myProfile?.userId && (myProfile.userId === targetId || myProfile.userId === profile?.userId || myProfile.userId === profile?.id)) ||
     Boolean(profile && (profile.userId === user?.id || profile.id === myProfile?.id));
+
+  const handleChatClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      toast.error('Silakan masuk terlebih dahulu untuk menggunakan fitur obrolan.');
+      return;
+    }
+
+    if (!isFollowing) {
+      toast.error(
+        `Anda harus mengikuti (follow) ${profile?.fullName || 'rekan alumni'} terlebih dahulu untuk memulai obrolan chat.`,
+        {
+          action: {
+            label: '+ Ikuti Sekarang',
+            onClick: () => handleToggleFollow(),
+          },
+          duration: 5000,
+        }
+      );
+      return;
+    }
+
+    router.push(`/chat/${targetId}`);
+  };
+
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 1. Pastikan file gambar
+    if (!file.type || !file.type.startsWith('image/')) {
+      toast.error('File yang dipilih bukan gambar. Harap pilih file gambar (JPG, PNG, WebP).');
+      if (coverInputRef.current) coverInputRef.current.value = '';
+      return;
+    }
+
+    // 2. Batas ukuran 25MB
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('Ukuran file foto terlalu besar. Maksimal 25MB.');
+      if (coverInputRef.current) coverInputRef.current.value = '';
+      return;
+    }
+
+    // 3. Baca gambar untuk dipotong langsung oleh user tanpa mengubah resolusi asli
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImageSrc(reader.result as string);
+      setIsCropModalOpen(true);
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    };
+    reader.onerror = () => {
+      toast.error('Gagal membaca file foto.');
+      if (coverInputRef.current) coverInputRef.current.value = '';
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropComplete = async (croppedDataUrl: string) => {
+    setIsUploadingCover(true);
+    const loadingToastId = toast.loading('Menyimpan foto cover (resolusi penuh tajam)...');
+
+    try {
+      // Simpan langsung hasil crop beresolusi penuh tanpa downscaling
+      const updated = await updateProfile({
+        coverPhotoUrl: croppedDataUrl,
+      });
+
+      if (updated) {
+        setProfile((prev) =>
+          prev ? { ...prev, coverPhotoUrl: updated.coverPhotoUrl || croppedDataUrl } : null
+        );
+        updateCurrentProfileState({ coverPhotoUrl: updated.coverPhotoUrl || croppedDataUrl });
+        toast.success('Foto cover profil berhasil dipotong dan diperbarui!', { id: loadingToastId });
+      } else {
+        throw new Error('Gagal menyimpan cover baru di server.');
+      }
+    } catch (err: any) {
+      console.error('Error uploading cover photo:', err);
+      toast.error(err?.message || 'Gagal mengubah foto cover. Silakan coba lagi.', {
+        id: loadingToastId,
+      });
+    } finally {
+      setIsUploadingCover(false);
+      setCropImageSrc(null);
+      if (coverInputRef.current) {
+        coverInputRef.current.value = '';
+      }
+    }
+  };
 
   useEffect(() => {
     if (requestedTab === 'posts') {
@@ -253,7 +396,21 @@ export default function ProfileDetailPage() {
     <div className="w-full pb-8">
       {/* 1. Cover Photo & Profile Avatar Header */}
       <div className="relative">
-        <div className="w-full h-40 bg-gradient-to-r from-brand-primary to-brand-primaryDeep relative overflow-hidden">
+        <div
+          onClick={() => {
+            if (profile.coverPhotoUrl) {
+              setPreviewImage({
+                src: profile.coverPhotoUrl,
+                title: `Foto Sampul: ${profile.fullName}`,
+                subtitle: `${profile.className || 'Alumni 59'} (Angkatan 1999)`,
+              });
+            }
+          }}
+          className={`w-full h-44 sm:h-52 bg-gradient-to-r from-brand-primary to-brand-primaryDeep relative overflow-hidden group ${
+            profile.coverPhotoUrl ? 'cursor-pointer' : ''
+          }`}
+          title={profile.coverPhotoUrl ? 'Klik untuk melihat foto sampul lebih besar' : undefined}
+        >
           {profile.coverPhotoUrl ? (
             <img
               src={profile.coverPhotoUrl}
@@ -261,21 +418,76 @@ export default function ProfileDetailPage() {
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center opacity-20 text-white font-black text-4xl">
+            <div className="absolute inset-0 flex items-center justify-center opacity-20 text-white font-black text-4xl select-none">
               SMAN 59 JAKARTA ’99
+            </div>
+          )}
+
+          {/* Tombol Ubah Cover di Bagian Kanan Bawah Foto Cover (Hanya untuk Pemilik Profil) */}
+          {isMe && (
+            <div
+              className="absolute bottom-3 right-3 z-20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                id="profile-cover-file-input"
+                onChange={handleCoverChange}
+                disabled={isUploadingCover}
+              />
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={isUploadingCover}
+                className="px-3.5 py-1.5 rounded-xl bg-black/65 hover:bg-black/85 backdrop-blur-md text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg border border-white/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-75 cursor-pointer"
+                title="Klik untuk mengubah foto cover profil"
+              >
+                {isUploadingCover ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin text-white" />
+                    <span>Mengunggah...</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera size={14} className="text-white" />
+                    <span>Ubah Cover</span>
+                  </>
+                )}
+              </button>
             </div>
           )}
         </div>
 
         {/* Avatar & Floating Actions */}
         <div className="px-4 flex items-end justify-between -mt-12 relative z-10">
-          <div className="p-1 bg-white rounded-full shadow-md">
+          <button
+            type="button"
+            onClick={() => {
+              if (profile.profilePhotoUrl) {
+                setPreviewImage({
+                  src: profile.profilePhotoUrl,
+                  title: `Foto Profil: ${profile.fullName}`,
+                  subtitle: `${profile.className || 'Alumni 59'} (Angkatan 1999)`,
+                });
+              }
+            }}
+            className="p-1 bg-white rounded-full shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer relative group focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            title="Klik untuk melihat foto profil lebih besar"
+          >
             <AppAvatar
               src={profile.profilePhotoUrl}
               name={profile.fullName}
               size="xl"
             />
-          </div>
+            {profile.profilePhotoUrl && (
+              <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs font-semibold">
+                <Eye size={20} className="drop-shadow-md" />
+              </div>
+            )}
+          </button>
 
           <div className="flex items-center gap-2 mb-2">
             {isMe ? (
@@ -315,13 +527,14 @@ export default function ProfileDetailPage() {
                   {isFollowing ? <UserCheck size={15} /> : <UserPlus size={15} />}
                   <span>{isFollowing ? 'Mengikuti' : 'Ikuti'}</span>
                 </button>
-                <Link
-                  href={`/chat/${targetId}`}
-                  className="p-2 rounded-xl bg-blue-50 text-brand-primary hover:bg-blue-100 transition-colors"
-                  title="Kirim Pesan Langsung"
+                <button
+                  type="button"
+                  onClick={handleChatClick}
+                  className="p-2 rounded-xl bg-blue-50 text-brand-primary hover:bg-blue-100 transition-colors cursor-pointer"
+                  title={isFollowing ? 'Kirim Pesan Langsung' : 'Ikuti alumni terlebih dahulu untuk chat'}
                 >
                   <MessageSquare size={16} />
-                </Link>
+                </button>
               </>
             )}
           </div>
@@ -956,7 +1169,7 @@ export default function ProfileDetailPage() {
                       <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                         <span className="text-slate-400 text-[11px] block">Kota / Wilayah Domisili</span>
                         <span className="font-semibold text-slate-800 text-xs block mt-0.5">
-                          {profile.city || 'Jakarta'} {profile.province ? `• ${profile.province}` : ''}
+                          {formatLocation(profile.city, profile.province)}
                         </span>
                       </div>
                     </div>
@@ -1120,6 +1333,29 @@ export default function ProfileDetailPage() {
           setUserShop(newShop);
           loadProfileData();
         }}
+      />
+
+      {/* 5. Image Preview Modal (Lihat foto profil & foto cover lebih besar) */}
+      <ImageViewModal
+        isOpen={!!previewImage}
+        onClose={() => setPreviewImage(null)}
+        src={previewImage?.src}
+        title={previewImage?.title}
+        subtitle={previewImage?.subtitle}
+      />
+
+      {/* 6. Modal Cropping Foto Cover Sesuai Ukuran Cover */}
+      <CoverCropModal
+        isOpen={isCropModalOpen}
+        imageSrc={cropImageSrc}
+        onClose={() => {
+          setIsCropModalOpen(false);
+          setCropImageSrc(null);
+          if (coverInputRef.current) coverInputRef.current.value = '';
+        }}
+        onCropComplete={handleCropComplete}
+        aspectRatio={2.5}
+        title="Sesuaikan Area Potong Cover Profil"
       />
     </div>
   );

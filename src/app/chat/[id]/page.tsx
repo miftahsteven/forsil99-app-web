@@ -9,12 +9,15 @@ import {
   sendMessage,
   startDirectChat,
 } from '@/services/chatService';
-import { fetchProfileById } from '@/services/authService';
+import { fetchProfileById, toggleFollow, fetchFollowStatus } from '@/services/authService';
 import { ChatMessage, AlumniProfile } from '@/types';
 import { AppAvatar } from '@/components/ui/AppAvatar';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
-import { ChevronLeft, Send, Image as ImageIcon, Phone } from 'lucide-react';
+import { ImageViewModal } from '@/components/ui/ImageViewModal';
+import { ChevronLeft, Send, Image as ImageIcon, Phone, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { rtdb } from '@/services/firebaseConfig';
+import { ref, onValue } from 'firebase/database';
 
 export default function ChatRoomPage() {
   const params = useParams();
@@ -28,6 +31,9 @@ export default function ChatRoomPage() {
   const [text, setText] = useState<string>('');
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isFollowing, setIsFollowing] = useState<boolean>(true);
+  const [isUpdatingFollow, setIsUpdatingFollow] = useState<boolean>(false);
+  const [isAvatarPreviewOpen, setIsAvatarPreviewOpen] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,12 +65,16 @@ export default function ChatRoomPage() {
         setMessages(msgs);
       }
 
-      // 2. Fetch full profile in background
-      fetchProfileById(targetId)
-        .then((prof) => {
-          if (prof) setTargetProfile(prof);
-        })
-        .catch(() => {});
+      // 2. Fetch full profile and follow status in background
+      Promise.all([
+        fetchProfileById(targetId),
+        fetchFollowStatus(targetId),
+      ]).then(([prof, followStatus]) => {
+        if (prof) setTargetProfile(prof);
+        if (followStatus && typeof followStatus.isFollowing === 'boolean') {
+          setIsFollowing(followStatus.isFollowing);
+        }
+      }).catch(() => {});
     } catch (err: any) {
       console.warn('Init chat error:', err);
       toast.error('Gagal memuat ruang obrolan.');
@@ -73,18 +83,54 @@ export default function ChatRoomPage() {
     }
   };
 
-  // Real-time polling for incoming messages
+  const handleFollow = async () => {
+    setIsUpdatingFollow(true);
+    try {
+      const res: any = await toggleFollow(targetId);
+      if (res && typeof res.isFollowing === 'boolean') {
+        setIsFollowing(res.isFollowing);
+        toast.success(
+          res.isFollowing
+            ? `Mulai mengikuti ${targetProfile?.fullName || 'alumni'}`
+            : `Berhenti mengikuti ${targetProfile?.fullName || 'alumni'}`
+        );
+      } else {
+        setIsFollowing(!isFollowing);
+      }
+    } catch {
+      toast.error('Gagal memperbarui status ikuti.');
+    } finally {
+      setIsUpdatingFollow(false);
+    }
+  };
+
+  // Real-time listener for incoming messages via Firebase RTDB (Zero 3-second Polling)
   useEffect(() => {
     if (!threadId) return;
-    const interval = setInterval(async () => {
+
+    let isSubscribed = true;
+    const chatSignalRef = ref(rtdb, `chatSignals/${threadId}`);
+    let initialSignal = true;
+
+    const unsubscribe = onValue(chatSignalRef, async (snapshot) => {
+      if (!isSubscribed) return;
+      // Skip initial mount snapshot since initChat() already loaded initial messages
+      if (initialSignal) {
+        initialSignal = false;
+        return;
+      }
       try {
         const fresh = await fetchThreadMessages(threadId);
-        if (fresh && fresh.length > 0) {
+        if (fresh && isSubscribed) {
           setMessages(fresh);
         }
       } catch {}
-    }, 3000);
-    return () => clearInterval(interval);
+    });
+
+    return () => {
+      isSubscribed = false;
+      unsubscribe();
+    };
   }, [threadId]);
 
   useEffect(() => {
@@ -94,6 +140,20 @@ export default function ChatRoomPage() {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim() || !threadId) return;
+
+    if (!isFollowing) {
+      toast.error(
+        `Anda harus mengikuti (follow) ${recipientName} terlebih dahulu untuk mengirim pesan.`,
+        {
+          action: {
+            label: '+ Ikuti Sekarang',
+            onClick: handleFollow,
+          },
+          duration: 5000,
+        }
+      );
+      return;
+    }
 
     const messageText = text.trim();
     setText('');
@@ -135,9 +195,20 @@ export default function ChatRoomPage() {
             <ChevronLeft size={20} />
           </button>
 
-          <Link href={`/profile/${targetId}`} className="flex items-center gap-2.5">
-            <AppAvatar src={recipientPhoto} name={recipientName} size="sm" />
-            <div>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                if (recipientPhoto) setIsAvatarPreviewOpen(true);
+              }}
+              className={`relative flex-shrink-0 rounded-full focus:outline-none ${
+                recipientPhoto ? 'cursor-zoom-in' : 'cursor-default'
+              }`}
+              title={recipientPhoto ? `Lihat foto ${recipientName} lebih besar` : undefined}
+            >
+              <AppAvatar src={recipientPhoto} name={recipientName} size="sm" />
+            </button>
+            <Link href={`/profile/${targetId}`} className="hover:opacity-80 transition-opacity">
               <div className="flex items-center gap-1">
                 <h3 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
                   {recipientName}
@@ -145,10 +216,30 @@ export default function ChatRoomPage() {
                 <VerifiedBadge size={13} />
               </div>
               <p className="text-[10px] text-brand-primary font-medium">{recipientClass}</p>
-            </div>
-          </Link>
+            </Link>
+          </div>
         </div>
       </div>
+
+      {/* Banner peringatan jika belum follow */}
+      {!isFollowing && targetProfile && (
+        <div className="bg-amber-50 border-b border-amber-200/80 px-3.5 py-2.5 flex items-center justify-between gap-2.5 text-xs text-amber-900 sticky top-[53px] z-10 shadow-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <UserPlus size={16} className="text-amber-600 flex-shrink-0" />
+            <span className="truncate">
+              Anda belum mengikuti <strong>{recipientName}</strong>. Ikuti untuk mengaktifkan fitur chat.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleFollow}
+            disabled={isUpdatingFollow}
+            className="px-3 py-1 bg-brand-primary hover:bg-brand-primaryDark text-white text-xs font-semibold rounded-lg flex-shrink-0 transition-all active:scale-95 shadow-xs cursor-pointer"
+          >
+            + Ikuti Sekarang
+          </button>
+        </div>
+      )}
 
       {/* Message History */}
       <div className="flex-1 p-4 overflow-y-auto space-y-3">
@@ -195,23 +286,49 @@ export default function ChatRoomPage() {
 
       {/* Input Message Form */}
       <div className="p-3 bg-white border-t border-slate-100">
-        <form onSubmit={handleSend} className="flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Tulis pesan alumni..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="flex-1 bg-slate-100 rounded-full px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
-          />
-          <button
-            type="submit"
-            disabled={!text.trim() || isSending}
-            className="p-2.5 bg-brand-primary text-white rounded-full hover:bg-brand-primaryDark disabled:opacity-40 shadow-sm transition-all active:scale-95"
-          >
-            <Send size={15} />
-          </button>
-        </form>
+        {!isFollowing ? (
+          <div className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-200/80 rounded-2xl p-2.5 px-4 text-xs text-slate-600">
+            <span className="truncate">
+              Ikuti <strong>{recipientName}</strong> untuk membuka fitur kirim pesan chat.
+            </span>
+            <button
+              type="button"
+              onClick={handleFollow}
+              disabled={isUpdatingFollow}
+              className="px-3.5 py-1.5 bg-brand-primary hover:bg-brand-primaryDark text-white font-semibold rounded-xl text-xs flex-shrink-0 shadow-xs cursor-pointer transition-all active:scale-95"
+            >
+              + Ikuti Sekarang
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSend} className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Tulis pesan alumni..."
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              className="flex-1 bg-slate-100 rounded-full px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+            />
+            <button
+              type="submit"
+              disabled={!text.trim() || isSending}
+              className="p-2.5 bg-brand-primary text-white rounded-full hover:bg-brand-primaryDark disabled:opacity-40 shadow-sm transition-all active:scale-95"
+            >
+              <Send size={15} />
+            </button>
+          </form>
+        )}
       </div>
+
+      {/* Lightbox Modal Foto Profil */}
+      <ImageViewModal
+        isOpen={isAvatarPreviewOpen}
+        onClose={() => setIsAvatarPreviewOpen(false)}
+        imageUrl={recipientPhoto}
+        altText={`Foto profil ${recipientName}`}
+        title={recipientName}
+        subtitle={`${recipientClass} (SMAN 59 ’99)`}
+      />
     </div>
   );
 }
