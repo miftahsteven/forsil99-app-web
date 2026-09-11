@@ -5,7 +5,7 @@ declare global {
 }
 
 export const RECAPTCHA_V3_SITE_KEY =
-  process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6Lc2i5UtAAAAAJ5j6TzvLV5W2_LDSbXPXTbg_UWJ';
+  process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LdJv7MtAAAAADgEch-oP9d9v8K7-smu4SlkehFS';
 
 let scriptLoadingPromise: Promise<void> | null = null;
 
@@ -43,7 +43,7 @@ export function loadRecaptchaV3Script(): Promise<void> {
 
 /**
  * Execute reCAPTCHA v3 and return the token
- * @param action 'login' | 'register'
+ * @param action 'login' | 'register' | 'register_otp' | 'forgot_password'
  */
 export async function executeRecaptchaV3(action: string): Promise<string | null> {
   if (typeof window === 'undefined') return null;
@@ -57,11 +57,19 @@ export async function executeRecaptchaV3(action: string): Promise<string | null>
         return resolve(null);
       }
 
+      // Safety timeout (3.5s) to ensure form submission never hangs if network or script stalls
+      const timeoutId = setTimeout(() => {
+        console.warn('reCAPTCHA v3 execution timed out, proceeding gracefully');
+        resolve(null);
+      }, 3500);
+
       window.grecaptcha.ready(async () => {
         try {
           const token = await window.grecaptcha.execute(RECAPTCHA_V3_SITE_KEY, { action });
+          clearTimeout(timeoutId);
           resolve(token || null);
         } catch (err) {
+          clearTimeout(timeoutId);
           console.error('reCAPTCHA v3 execution failed:', err);
           resolve(null);
         }

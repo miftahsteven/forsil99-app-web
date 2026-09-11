@@ -3,7 +3,7 @@
 import React, { forwardRef } from 'react';
 import ReCAPTCHA from 'react-google-recaptcha';
 
-const DEFAULT_SITE_KEY = '6Lc2i5UtAAAAAJ5j6TzvLV5W2_LDSbXPXTbg_UWJ';
+const DEFAULT_SITE_KEY = '6LdJv7MtAAAAADgEch-oP9d9v8K7-smu4SlkehFS';
 
 interface AppRecaptchaProps {
   onChange: (token: string | null) => void;

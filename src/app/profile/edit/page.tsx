@@ -424,20 +424,18 @@ export default function EditProfilePage() {
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Status Card: Kelengkapan Data & Kategori Profil */}
         <div
-          className={`p-5 rounded-2xl border-2 shadow-xs transition-all ${
-            isFormComplete
+          className={`p-5 rounded-2xl border-2 shadow-xs transition-all ${isFormComplete
               ? 'bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white border-emerald-300'
               : 'bg-gradient-to-br from-amber-50 via-orange-50/60 to-white border-amber-300'
-          }`}
+            }`}
         >
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wide ${
-                  isFormComplete
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold tracking-wide ${isFormComplete
                     ? 'bg-emerald-600 text-white'
                     : 'bg-amber-600 text-white shadow-xs'
-                }`}
+                  }`}
               >
                 {isFormComplete ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
                 {isFormComplete ? 'STATUS: DATA 100% LENGKAP' : 'STATUS DATA: BELUM LENGKAP'}
@@ -448,8 +446,8 @@ export default function EditProfilePage() {
                   ? profileVisibility === 'public'
                     ? 'Super Extrov (👑)'
                     : profileVisibility === 'followers'
-                    ? 'Extrov (🔷)'
-                    : 'Introv (⚪)'
+                      ? 'Extrov (🔷)'
+                      : 'Introv (⚪)'
                   : 'Introv (⚪ Default Data Belum Lengkap)'}
               </span>
             </div>
@@ -460,11 +458,10 @@ export default function EditProfilePage() {
 
           <div className="w-full h-3 bg-slate-200/70 rounded-full overflow-hidden mb-3 p-0.5">
             <div
-              className={`h-full transition-all duration-500 rounded-full ${
-                isFormComplete
+              className={`h-full transition-all duration-500 rounded-full ${isFormComplete
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
                   : 'bg-gradient-to-r from-amber-500 to-orange-500'
-              }`}
+                }`}
               style={{ width: `${Math.min(Math.max(formPercentage, 8), 100)}%` }}
             />
           </div>
@@ -567,11 +564,10 @@ export default function EditProfilePage() {
           <div className="grid grid-cols-1 gap-2.5">
             {/* Opsi 1: Super Extrov */}
             <label
-              className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
-                profileVisibility === 'public'
+              className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${profileVisibility === 'public'
                   ? 'border-amber-400 bg-amber-50/50 shadow-xs'
                   : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
+                }`}
             >
               <input
                 type="radio"
@@ -626,11 +622,10 @@ export default function EditProfilePage() {
 
             {/* Opsi 2: Extrov */}
             <label
-              className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
-                profileVisibility === 'followers'
+              className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${profileVisibility === 'followers'
                   ? 'border-blue-400 bg-blue-50/50 shadow-xs'
                   : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
+                }`}
             >
               <input
                 type="radio"
@@ -665,11 +660,10 @@ export default function EditProfilePage() {
 
             {/* Opsi 3: Introv */}
             <label
-              className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${
-                profileVisibility === 'private'
+              className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${profileVisibility === 'private'
                   ? 'border-slate-400 bg-slate-50/80 shadow-xs'
                   : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
+                }`}
             >
               <input
                 type="radio"
@@ -732,7 +726,6 @@ export default function EditProfilePage() {
               >
                 <option value="3 IPA 1">3 IPA 1</option>
                 <option value="3 IPA 2">3 IPA 2</option>
-                <option value="3 IPA 3">3 IPA 3</option>
                 <option value="3 IPS 1">3 IPS 1</option>
                 <option value="3 IPS 2">3 IPS 2</option>
                 <option value="3 IPS 3">3 IPS 3</option>
@@ -965,11 +958,10 @@ export default function EditProfilePage() {
                     key={hobby}
                     type="button"
                     onClick={() => handleToggleHobby(hobby)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                      isSelected
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${isSelected
                         ? 'bg-brand-primary text-white shadow-xs scale-102'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                      }`}
                   >
                     {isSelected ? '✓ ' : '+ '}
                     {hobby}

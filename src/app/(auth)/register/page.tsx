@@ -39,7 +39,6 @@ import { PrivacyPolicyModal } from '@/components/legal/PrivacyPolicyModal';
 const CLASSES = [
   '3 IPA 1',
   '3 IPA 2',
-  '3 IPA 3',
   '3 IPS 1',
   '3 IPS 2',
   '3 IPS 3',

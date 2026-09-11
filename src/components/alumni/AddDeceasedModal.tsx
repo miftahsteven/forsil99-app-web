@@ -27,7 +27,6 @@ interface AddDeceasedModalProps {
 const CLASS_OPTIONS = [
   '3 IPA 1',
   '3 IPA 2',
-  '3 IPA 3',
   '3 IPS 1',
   '3 IPS 2',
   '3 IPS 3',

@@ -17,7 +17,6 @@ const CLASS_FILTERS = [
   'Semua',
   '3 IPA 1',
   '3 IPA 2',
-  '3 IPA 3',
   '3 IPS 1',
   '3 IPS 2',
   '3 IPS 3',
@@ -197,11 +196,10 @@ export default function AlumniDirectoryPage() {
       <div className="bg-white rounded-2xl p-1.5 border border-slate-200/80 shadow-subtle flex items-center gap-1.5">
         <button
           onClick={() => setActiveTab('directory')}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeTab === 'directory'
+          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${activeTab === 'directory'
               ? 'bg-brand-primary text-white shadow-sm'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
+            }`}
         >
           <Users size={15} />
           <span>Direktori Alumni ({profiles.length})</span>
@@ -209,11 +207,10 @@ export default function AlumniDirectoryPage() {
 
         <button
           onClick={() => setActiveTab('memorial')}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
-            activeTab === 'memorial'
+          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${activeTab === 'memorial'
               ? 'bg-gradient-to-r from-slate-900 to-amber-950 text-amber-200 border border-amber-500/30 shadow-sm'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
+            }`}
         >
           <span className="text-sm">🕊️</span>
           <span>Yang Telah Pergi ({deceasedList.length})</span>
@@ -244,13 +241,12 @@ export default function AlumniDirectoryPage() {
             <button
               key={c}
               onClick={() => setSelectedClass(c)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                selectedClass === c
+              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${selectedClass === c
                   ? activeTab === 'directory'
                     ? 'bg-brand-primary text-white shadow-xs'
                     : 'bg-amber-500 text-slate-950 font-bold shadow-xs'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-100'
-              }`}
+                }`}
             >
               {c}
             </button>
@@ -341,11 +337,10 @@ export default function AlumniDirectoryPage() {
                         <button
                           key={idx}
                           onClick={() => handlePageChange(page)}
-                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                            currentPage === page
+                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentPage === page
                               ? 'bg-brand-primary text-white shadow-xs'
                               : 'text-slate-700 hover:bg-slate-100 border border-slate-200/80'
-                          }`}
+                            }`}
                         >
                           {page}
                         </button>
@@ -454,11 +449,10 @@ export default function AlumniDirectoryPage() {
                         <button
                           key={idx}
                           onClick={() => handlePageChange(page)}
-                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                            currentPage === page
+                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentPage === page
                               ? 'bg-amber-500 text-slate-950 shadow-xs'
                               : 'text-slate-300 hover:bg-slate-800 border border-slate-700'
-                          }`}
+                            }`}
                         >
                           {page}
                         </button>
