@@ -118,32 +118,32 @@ export function PrivacyPolicyModal({ isOpen, onClose, onAccept }: PrivacyPolicyM
             </p>
             <div className="space-y-2 text-[11px]">
               <div className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/40">
-                <span className="font-bold text-amber-900">👑 Kategori Super Extrov (Crown Emas):</span>
+                <span className="font-bold text-amber-900">👑 Kategori Open Alumni:</span>
                 <p className="text-slate-700 mt-0.5">
-                  Alumni melengkapi 100% data dan membuka akses informasi profil kepada seluruh rekan alumni terverifikasi. Alumni juga dapat memanfaatkan opsi pembukaan profil sementara dengan batas waktu (1, 3, atau 7 hari).
+                  Alumni melengkapi 100% data dan membuka akses informasi profil kepada seluruh rekan alumni terverifikasi. Terbuka untuk semua alumni, dan alumni juga dapat memanfaatkan opsi pembukaan profil sementara dengan batas waktu (1, 3, atau 7 hari).
                 </p>
               </div>
               <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/40">
-                <span className="font-bold text-blue-900">🔷 Kategori Extrov (Centang Biru):</span>
+                <span className="font-bold text-blue-900">🔷 Kategori Khusus Pengikut Saja (Connected Alumni) (Centang Biru):</span>
                 <p className="text-slate-700 mt-0.5">
-                  Alumni melengkapi 100% data, namun membatasi rincian profil hanya dapat diakses oleh rekan alumni yang telah mem-follow akun tersebut.
+                  Alumni melengkapi 100% data, dengan rincian profil terbuka untuk koneksi atau rekan alumni yang telah saling mengikuti (followers).
                 </p>
               </div>
               <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50">
-                <span className="font-bold text-slate-800">⚪ Kategori Introv (Centang Abu-abu):</span>
+                <span className="font-bold text-slate-800">⚪ Kategori Private Alumni (Centang Abu-abu):</span>
                 <p className="text-slate-700 mt-0.5">
-                  Alumni melengkapi 100% data, namun menutup rincian kontak dan alamat domisili (mode private). Data tetap aman dan tidak dapat diakses pihak luar.
+                  Alumni melengkapi 100% data, namun menutup rincian kontak dan alamat domisili (mode privat). Data tetap aman dan tidak dapat diakses pihak luar.
                 </p>
               </div>
-              <div className="p-2.5 rounded-xl border border-slate-200 bg-white">
-                <span className="font-bold text-slate-600">⚪ Kategori Super Introv (Tanpa Icon):</span>
+              <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50">
+                <span className="font-bold text-slate-800">⚪ Kategori New Alumni (Centang Abu-abu):</span>
                 <p className="text-slate-700 mt-0.5">
-                  Alumni belum melengkapi data profil secara penuh (&lt; 100%) dan mendapatkan pengingat berkala untuk melengkapi isian data.
+                  Alumni baru terdaftar atau belum melengkapi data profil secara penuh (&lt; 100%) dan mendapatkan panduan berkala untuk melengkapi isian data.
                 </p>
               </div>
             </div>
             <p className="text-[11px] text-slate-600">
-              <strong className="text-slate-800">Notifikasi Kunjungan:</strong> Untuk menjamin keterbukaan timbal-balik, alumni kategori Super Extrov dan Extrov menyetujui bahwa sistem akan mengirimkan notifikasi inbox dan push setiap kali profilnya dibuka oleh rekan alumni lain (mencakup nama pengunjung dan waktu kunjungan).
+              <strong className="text-slate-800">Notifikasi Kunjungan:</strong> Untuk menjamin keterbukaan timbal-balik, alumni kategori Open Alumni dan Khusus Pengikut Saja (Connected Alumni) menyetujui bahwa sistem akan mengirimkan notifikasi inbox dan push setiap kali profilnya dibuka oleh rekan alumni lain (mencakup nama pengunjung dan waktu kunjungan).
             </p>
           </div>
 
@@ -214,7 +214,7 @@ export function PrivacyPolicyModal({ isOpen, onClose, onAccept }: PrivacyPolicyM
             </p>
             <ul className="list-disc pl-5 space-y-1 text-slate-600 text-[11px]">
               <li>Mengakses dan memperbarui data pribadi kapan saja melalui menu Edit Profil.</li>
-              <li>Mengubah preferensi keterbukaan data (Super Extrov / Extrov / Introv) kapan saja secara mandiri.</li>
+              <li>Mengubah preferensi keterbukaan data (Open Alumni / Connected Alumni / Private Alumni) kapan saja secara mandiri.</li>
               <li>Menghubungi pengurus komunitas melalui email resmi <strong className="text-brand-primary">admin@forsil99.us</strong> untuk konsultasi keamanan atau permintaan penghapusan akun.</li>
             </ul>
           </div>

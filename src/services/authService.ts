@@ -302,7 +302,7 @@ export async function updateProfile(payload: {
   company?: string;
   hobbies?: string[];
   profileVisibility?: 'public' | 'followers' | 'private';
-  profileCategory?: 'super_extrov' | 'extrov' | 'introv';
+  profileCategory?: 'open' | 'connected' | 'private' | 'new' | 'super_extrov' | 'extrov' | 'introv';
   tempPublicHours?: number;
   profilePhotoUrl?: string;
   coverPhotoUrl?: string;

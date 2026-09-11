@@ -382,8 +382,8 @@ export default function EditProfilePage() {
         bio: bio.trim() || undefined,
         profileVisibility,
         profileCategory: isFormComplete
-          ? (profileVisibility === 'public' ? 'super_extrov' : profileVisibility === 'followers' ? 'extrov' : 'introv')
-          : 'introv',
+          ? (profileVisibility === 'public' ? 'open' : profileVisibility === 'followers' ? 'connected' : 'private')
+          : 'new',
         tempPublicHours: tempPublicHours !== '0' ? parseInt(tempPublicHours, 10) : 0,
         profilePhotoUrl: profilePhotoUrl || undefined,
         coverPhotoUrl: coverPhotoUrl || undefined,
@@ -394,7 +394,7 @@ export default function EditProfilePage() {
         if (updated.isComplete) {
           toast.success('Profil berhasil diperbarui dengan data 100% lengkap!');
         } else {
-          toast.success('Perubahan data berhasil disimpan! Status profil: Belum Lengkap (Kategori: Introv).');
+          toast.success('Perubahan data berhasil disimpan! Status: Data Belum Lengkap (New Alumni).');
         }
         router.push(`/profile/${profile?.uid || 'me'}`);
       }
@@ -444,11 +444,11 @@ export default function EditProfilePage() {
                 Kategori:{' '}
                 {isFormComplete
                   ? profileVisibility === 'public'
-                    ? 'Super Extrov (👑)'
+                    ? 'Open Alumni (👑)'
                     : profileVisibility === 'followers'
-                      ? 'Extrov (🔷)'
-                      : 'Introv (⚪)'
-                  : 'Introv (⚪ Default Data Belum Lengkap)'}
+                      ? 'Khusus Pengikut Saja (Connected Alumni) (🔷)'
+                      : 'Private Alumni (⚪)'
+                  : 'New Alumni (⚪ Data Belum Lengkap)'}
               </span>
             </div>
             <span className="text-xs font-extrabold text-slate-800 bg-white/80 px-2.5 py-1 rounded-lg border border-slate-200">
@@ -469,11 +469,11 @@ export default function EditProfilePage() {
           {!isFormComplete ? (
             <div className="space-y-2 text-xs text-slate-700 leading-relaxed">
               <p>
-                <strong className="text-amber-950 font-bold">Pengingat Forsil 99:</strong> Seluruh pendaftar baru secara default memiliki status kategori <strong className="text-slate-900 font-extrabold">Introv</strong> karena data belum terisi lengkap.{' '}
+                <strong className="text-amber-950 font-bold">Status New Alumni:</strong> Akun baru yang datanya belum terisi 100% berstatus <strong className="text-slate-800 font-extrabold">⚪ New Alumni (Centang Abu-abu)</strong>.{' '}
                 <span className="bg-amber-100/80 text-amber-950 font-semibold px-1 py-0.5 rounded">
                   Anda tetap bisa menyimpan perubahan data kapan saja meski belum lengkap.
                 </span>{' '}
-                Setelah seluruh 12 data terisi lengkap (100%), Anda bebas memilih kategori profil Super Extrov (👑), Extrov (🔷), atau tetap Introv (⚪).
+                Setelah seluruh 12 data terisi lengkap (100%), Anda bebas memilih kategori profil: Open Alumni (👑), Khusus Pengikut Saja (Connected Alumni) (🔷 Centang Biru), atau tetap Private Alumni (⚪ Centang Abu-abu).
               </p>
               {formMissingList.length > 0 && (
                 <div className="pt-1">
@@ -496,7 +496,7 @@ export default function EditProfilePage() {
             </div>
           ) : (
             <p className="text-xs text-emerald-900 leading-relaxed font-semibold">
-              🎉 Selamat! Seluruh 12 data alumni Anda sudah lengkap. Anda bebas memilih kategori profil di bawah: Super Extrov (👑 Crown Emas), Extrov (🔷 Centang Biru), atau tetap Introv (⚪).
+              🎉 Selamat! Seluruh 12 data alumni Anda sudah lengkap. Anda bebas memilih kategori profil di bawah: Open Alumni (👑 Crown Emas), Connected Alumni (🔷 Centang Biru), atau tetap Private Alumni (⚪).
             </p>
           )}
         </div>
@@ -562,7 +562,7 @@ export default function EditProfilePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-2.5">
-            {/* Opsi 1: Super Extrov */}
+            {/* Opsi 1: Open Alumni */}
             <label
               className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${profileVisibility === 'public'
                   ? 'border-amber-400 bg-amber-50/50 shadow-xs'
@@ -580,7 +580,7 @@ export default function EditProfilePage() {
               <div className="flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <Crown size={16} className="fill-amber-400 text-amber-700" />
-                  <span className="text-xs font-bold text-slate-900">Buka untuk Semua Alumni (Super Extrov)</span>
+                  <span className="text-xs font-bold text-slate-900">Buka untuk Semua Alumni (Open Alumni)</span>
                   {isFormComplete ? (
                     <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                       👑 Siap Digunakan
@@ -620,7 +620,7 @@ export default function EditProfilePage() {
               </div>
             </label>
 
-            {/* Opsi 2: Extrov */}
+            {/* Opsi 2: Connected Alumni */}
             <label
               className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${profileVisibility === 'followers'
                   ? 'border-blue-400 bg-blue-50/50 shadow-xs'
@@ -641,7 +641,7 @@ export default function EditProfilePage() {
               <div className="flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <BadgeCheck size={16} className="fill-blue-500 text-white" />
-                  <span className="text-xs font-bold text-slate-900">Khusus Pengikut Saja (Extrov)</span>
+                  <span className="text-xs font-bold text-slate-900">Khusus Pengikut Saja (Connected Alumni)</span>
                   {isFormComplete ? (
                     <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
                       🔷 Siap Digunakan
@@ -653,12 +653,12 @@ export default function EditProfilePage() {
                   )}
                 </div>
                 <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                  Hanya alumni yang mengikuti (followers) yang dapat melihat rincian kontak dan profil lengkap Anda. Mendapatkan lencana 🔷 Centang Biru.
+                  Hanya alumni yang saling mengikuti (followers/koneksi) yang dapat melihat rincian kontak dan profil lengkap Anda. Mendapatkan lencana 🔷 Centang Biru.
                 </p>
               </div>
             </label>
 
-            {/* Opsi 3: Introv */}
+            {/* Opsi 3: Private Alumni */}
             <label
               className={`p-3.5 rounded-xl border-2 cursor-pointer transition-all flex items-start gap-3 ${profileVisibility === 'private'
                   ? 'border-slate-400 bg-slate-50/80 shadow-xs'
@@ -679,13 +679,13 @@ export default function EditProfilePage() {
               <div className="flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <CheckCircle2 size={15} className="fill-slate-400 text-white" />
-                  <span className="text-xs font-bold text-slate-900">Privat / Tertutup (Introv)</span>
+                  <span className="text-xs font-bold text-slate-900">Profil Privat (Private Alumni)</span>
                   <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
-                    ⚪ Default Pendaftar Baru
+                    ⚪ Profil Privat
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                  Menutup informasi profil dari semua alumni (hanya Anda yang dapat melihat rincian). Mendapatkan lencana ⚪ Centang Abu-abu.
+                  Menutup informasi detail profil dari alumni lain (hanya Anda yang dapat melihat rincian). Mendapatkan lencana ⚪.
                 </p>
               </div>
             </label>
@@ -1078,7 +1078,7 @@ export default function EditProfilePage() {
                   .
                 </p>
                 <p className="text-[11px] text-slate-500 leading-normal">
-                  Persetujuan ini mencakup: penyimpanan data profil di basis data resmi Forsil 99, penerapan sistem klasifikasi tingkatan profil (Super Extrov, Extrov, Introv), komitmen tidak membagikan akses login akun ke pihak lain, serta kepatuhan penuh terhadap UU No. 27 Tahun 2022 (UU PDP).
+                  Persetujuan ini mencakup: penyimpanan data profil di basis data resmi Forsil 99, penerapan sistem klasifikasi tingkatan profil (Open Alumni, Connected Alumni, Private Alumni, New Alumni), komitmen tidak membagikan akses login akun ke pihak lain, serta kepatuhan penuh terhadap UU No. 27 Tahun 2022 (UU PDP).
                 </p>
               </div>
             </label>

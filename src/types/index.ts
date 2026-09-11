@@ -72,7 +72,7 @@ export interface AlumniProfile {
   tempPublicUntil?: string | null;
   effectiveVisibility?: 'public' | 'followers' | 'private';
   isTempPublic?: boolean;
-  profileCategory?: 'super_extrov' | 'extrov' | 'introv' | 'super_introv';
+  profileCategory?: 'open' | 'connected' | 'private' | 'new' | 'super_extrov' | 'extrov' | 'introv' | 'super_introv';
   isComplete?: boolean;
   completionPercentage?: number;
   completedFieldsCount?: number;

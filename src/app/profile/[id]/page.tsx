@@ -830,7 +830,7 @@ export default function ProfileDetailPage() {
                   </span>
                   <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-slate-700">
                     <CheckCircle2 size={12} className="text-emerald-500" />
-                    Minimal Kategori Extrov
+                    Minimal Connected Alumni
                   </span>
                   <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 flex items-center gap-1 text-slate-700">
                     <CheckCircle2 size={12} className="text-emerald-500" />
@@ -977,9 +977,9 @@ export default function ProfileDetailPage() {
                 <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center gap-2.5 text-xs text-emerald-900">
                   <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
                   <p className="text-[11px] leading-snug">
-                    {profile.profileCategory === 'super_extrov'
-                      ? 'Kanal profil ini dibuka untuk seluruh rekan alumni terverifikasi (Kategori Super Extrov).'
-                      : 'Kanal profil ini dibuka khusus untuk rekan yang saling mengikuti (Kategori Extrov).'}
+                    {profile.profileCategory === 'open' || profile.profileCategory === 'super_extrov'
+                      ? 'Kanal profil ini dibuka untuk seluruh rekan alumni terverifikasi (Kategori Open Alumni).'
+                      : 'Kanal profil ini dibuka khusus untuk rekan yang saling mengikuti (Kategori Connected Alumni).'}
                   </p>
                 </div>
               )
@@ -989,7 +989,7 @@ export default function ProfileDetailPage() {
             {!isMe && profile.canViewDetails === false ? (
               <div className="space-y-4">
                 {profile.privacyRestriction === 'followers_only' ? (
-                  /* Extrov: Followers Only Lock Card */
+                  /* Connected Alumni: Followers Only Lock Card */
                   <div className="bg-blue-50/60 border border-blue-200 rounded-3xl p-6 text-center space-y-4 shadow-xs">
                     <div className="w-14 h-14 mx-auto rounded-2xl bg-blue-100 text-brand-primary flex items-center justify-center shadow-xs">
                       <Lock size={26} />
@@ -997,7 +997,7 @@ export default function ProfileDetailPage() {
                     <div className="space-y-1.5">
                       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold">
                         <BadgeCheck size={14} className="text-blue-600" />
-                        <span>Kategori Extrov (Khusus Pengikut)</span>
+                        <span>Kategori Connected Alumni (Khusus Pengikut)</span>
                       </div>
                       <h3 className="font-bold text-slate-900 text-base">Detail Database Alumni Terkunci</h3>
                       <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
@@ -1022,7 +1022,7 @@ export default function ProfileDetailPage() {
                     </div>
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200 text-slate-700 text-xs font-bold">
                       <CheckCircle2 size={14} className="text-slate-500" />
-                      <span>Kategori Introv (Profil Privat)</span>
+                      <span>Kategori Private Alumni (Profil Privat)</span>
                     </div>
                     <h3 className="font-bold text-slate-900 text-base">Detail Kontak & Domisili Dirahasiakan</h3>
                     <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">

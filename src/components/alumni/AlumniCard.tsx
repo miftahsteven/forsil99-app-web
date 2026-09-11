@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, UserPlus, UserCheck, MapPin, Briefcase } from 'lucide-react';
+import { MessageSquare, UserPlus, UserCheck, MapPin, Briefcase, Calendar } from 'lucide-react';
 import { AlumniProfile } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { toggleFollow } from '@/services/authService';
@@ -16,6 +16,21 @@ import { toast } from 'sonner';
 interface AlumniCardProps {
   alumni: AlumniProfile;
   isFollowingInitial?: boolean;
+}
+
+function formatJoinDate(dateStr?: string) {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return new Intl.DateTimeFormat('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(d);
+  } catch {
+    return null;
+  }
 }
 
 export function AlumniCard({ alumni, isFollowingInitial = false }: AlumniCardProps) {
@@ -144,22 +159,26 @@ export function AlumniCard({ alumni, isFollowingInitial = false }: AlumniCardPro
             )}
           </div>
 
-          {(alumni.occupation || alumni.city) && (
-            <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1 truncate">
-              {alumni.occupation && (
-                <span className="flex items-center gap-1 truncate">
-                  <Briefcase size={12} className="text-slate-400 flex-shrink-0" />
-                  <span className="truncate">{alumni.occupation}</span>
-                </span>
-              )}
-              {alumni.city && (
-                <span className="flex items-center gap-1 truncate">
-                  <MapPin size={12} className="text-slate-400 flex-shrink-0" />
-                  <span className="truncate">{alumni.city}</span>
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2.5 text-[11px] text-slate-500 mt-1 flex-wrap">
+            {alumni.createdAt && (
+              <span className="flex items-center gap-1 text-slate-500 font-medium" title={`Terdaftar sejak ${formatJoinDate(alumni.createdAt)}`}>
+                <Calendar size={11} className="text-slate-400 flex-shrink-0" />
+                <span>Bergabung {formatJoinDate(alumni.createdAt)}</span>
+              </span>
+            )}
+            {alumni.occupation && (
+              <span className="flex items-center gap-1 truncate">
+                <Briefcase size={11} className="text-slate-400 flex-shrink-0" />
+                <span className="truncate">{alumni.occupation}</span>
+              </span>
+            )}
+            {alumni.city && (
+              <span className="flex items-center gap-1 truncate">
+                <MapPin size={11} className="text-slate-400 flex-shrink-0" />
+                <span className="truncate">{alumni.city}</span>
+              </span>
+            )}
+          </div>
         </Link>
       </div>
 

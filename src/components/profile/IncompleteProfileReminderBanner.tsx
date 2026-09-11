@@ -31,8 +31,8 @@ export function IncompleteProfileReminderBanner({ profile, className = '' }: Inc
               STATUS DATA: BELUM LENGKAP
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide bg-slate-800 text-amber-200 border border-slate-700 shadow-xs">
-              <CheckCircle2 size={12} className="text-slate-400 fill-slate-500" />
-              Kategori Saat Ini: INTROV
+              <CheckCircle2 size={13} className="fill-slate-400 text-white" />
+              Kategori: NEW ALUMNI (⚪ Centang Abu-abu)
             </span>
           </div>
 
@@ -42,13 +42,13 @@ export function IncompleteProfileReminderBanner({ profile, className = '' }: Inc
           </h3>
 
           <p className="text-xs sm:text-sm text-slate-700 mt-1.5 leading-relaxed">
-            Sesuai ketentuan Forsil 99, seluruh alumni baru secara default berkategori{' '}
-            <strong className="text-slate-900 font-bold">Introv</strong> karena data belum terisi lengkap.{' '}
+            Sesuai ketentuan Forsil 99, seluruh akun alumni baru yang datanya belum terisi 100% berstatus{' '}
+            <strong className="text-slate-800 font-bold">⚪ New Alumni (Centang Abu-abu)</strong>.{' '}
             <span className="text-amber-900 font-semibold bg-amber-100/70 px-1 py-0.5 rounded">
               Anda tetap dapat menyimpan data sewaktu-waktu meskipun belum lengkap.
             </span>{' '}
             Setelah seluruh 12 data lengkap (100%), Anda bebas memilih kategori profil yang Anda inginkan:
-            Super Extrov (👑 Crown Emas), Extrov (🔷 Centang Biru), atau tetap Introv (⚪).
+            Open Alumni (👑 Crown Emas), Khusus Pengikut Saja (Connected Alumni) (🔷 Centang Biru), atau tetap Private Alumni (⚪ Centang Abu-abu).
           </p>
         </div>
 
@@ -96,42 +96,42 @@ export function IncompleteProfileReminderBanner({ profile, className = '' }: Inc
 
         {/* 3 Categories Options Info */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-          {/* Super Extrov */}
+          {/* Open Alumni */}
           <div className="p-3 bg-white/95 rounded-xl border border-amber-300 shadow-2xs hover:border-amber-400 transition-all">
             <div className="flex items-center gap-1.5 mb-1.5">
               <span className="p-1 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-900 shadow-2xs">
                 <Crown size={14} className="fill-yellow-300 text-amber-900" />
               </span>
-              <span className="text-xs font-bold text-slate-900">Super Extrov (👑)</span>
+              <span className="text-xs font-bold text-slate-900">Open Alumni (👑)</span>
             </div>
             <p className="text-[11px] text-slate-600 leading-relaxed">
               Profil 100% lengkap & terbuka untuk semua alumni. Bebas atur akses buka permanen atau sementara.
             </p>
           </div>
 
-          {/* Extrov */}
+          {/* Connected Alumni */}
           <div className="p-3 bg-white/95 rounded-xl border border-blue-200 shadow-2xs hover:border-blue-300 transition-all">
             <div className="flex items-center gap-1.5 mb-1.5">
               <span className="p-1 rounded-full bg-blue-50 text-blue-600">
                 <BadgeCheck size={16} className="fill-blue-500 text-white" />
               </span>
-              <span className="text-xs font-bold text-slate-900">Extrov (🔷)</span>
+              <span className="text-xs font-bold text-slate-900">Khusus Pengikut Saja (Connected Alumni) (🔷)</span>
             </div>
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              Profil 100% lengkap & hanya dapat dilihat oleh alumni yang saling mengikuti (followers).
+              Profil 100% lengkap & detail kontak hanya dapat dilihat oleh alumni yang saling mengikuti (followers).
             </p>
           </div>
 
-          {/* Introv */}
+          {/* Private Alumni */}
           <div className="p-3 bg-white/95 rounded-xl border border-slate-300 shadow-2xs hover:border-slate-400 transition-all">
             <div className="flex items-center gap-1.5 mb-1.5">
               <span className="p-1 rounded-full bg-slate-100 text-slate-600">
                 <CheckCircle2 size={15} className="fill-slate-400 text-white" />
               </span>
-              <span className="text-xs font-bold text-slate-900">Introv (⚪)</span>
+              <span className="text-xs font-bold text-slate-900">Private Alumni (⚪)</span>
             </div>
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              Default bagi data belum lengkap, atau profil privat bagi alumni yang ingin menjaga privasi kontak.
+              Profil privat bagi alumni yang ingin menjaga kerahasiaan kontak dan rincian data pribadinya.
             </p>
           </div>
         </div>

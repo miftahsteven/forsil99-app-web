@@ -2,7 +2,7 @@ import React from 'react';
 import { Crown, BadgeCheck, CheckCircle2 } from 'lucide-react';
 
 export interface ProfileCategoryBadgeProps {
-  category?: 'super_extrov' | 'extrov' | 'introv' | 'super_introv' | string;
+  category?: 'open' | 'connected' | 'private' | 'new' | 'super_extrov' | 'extrov' | 'introv' | 'super_introv' | string;
   size?: number;
   showLabel?: boolean;
   className?: string;
@@ -14,33 +14,35 @@ export function ProfileCategoryBadge({
   showLabel = false,
   className = '',
 }: ProfileCategoryBadgeProps) {
-  if (!category || category === 'super_introv') {
+  if (!category) {
     return null;
   }
 
-  if (category === 'super_extrov') {
+  // 1. Open Alumni (👑 Crown Emas) - Terbuka untuk semua alumni
+  if (category === 'open' || category === 'super_extrov') {
     return (
       <span
         className={`inline-flex items-center gap-1 group relative cursor-help ${className}`}
-        title="👑 Super Extrov: Profil Lengkap & Terbuka untuk Semua Alumni"
+        title="👑 Open Alumni: Terbuka untuk Semua Alumni"
       >
         <span className="p-0.5 rounded-full bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-200 text-slate-900 shadow-sm transition-transform group-hover:scale-110">
           <Crown size={size} className="fill-yellow-400 text-amber-700 stroke-[2.2]" />
         </span>
         {showLabel && (
           <span className="text-[11px] font-bold tracking-tight text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-            Super Extrov
+            Open Alumni
           </span>
         )}
       </span>
     );
   }
 
-  if (category === 'extrov') {
+  // 2. Khusus Pengikut Saja (Connected Alumni) (🔷 Centang Biru) - Detail untuk koneksi/follower
+  if (category === 'connected' || category === 'extrov') {
     return (
       <span
         className={`inline-flex items-center gap-1 group relative cursor-help ${className}`}
-        title="🔷 Extrov: Profil Lengkap & Terbuka Khusus Pengikut (Followers)"
+        title="🔷 Khusus Pengikut Saja (Connected Alumni): Detail untuk Koneksi / Pengikut"
       >
         <BadgeCheck
           size={size + 2}
@@ -48,18 +50,19 @@ export function ProfileCategoryBadge({
         />
         {showLabel && (
           <span className="text-[11px] font-bold tracking-tight text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
-            Extrov
+            Connected Alumni
           </span>
         )}
       </span>
     );
   }
 
-  if (category === 'introv') {
+  // 3. Private Alumni (⚪ Centang Abu-abu) - Profil privat
+  if (category === 'private' || category === 'introv') {
     return (
       <span
         className={`inline-flex items-center gap-1 group relative cursor-help ${className}`}
-        title="⚪ Introv: Kategori Profil Privat / Default Pendaftar Baru (Data Belum Lengkap)"
+        title="⚪ Private Alumni: Profil Privat"
       >
         <CheckCircle2
           size={size}
@@ -67,7 +70,27 @@ export function ProfileCategoryBadge({
         />
         {showLabel && (
           <span className="text-[11px] font-bold tracking-tight text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
-            Introv
+            Private Alumni
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  // 4. New Alumni / Data Belum Lengkap (⚪ Centang Abu-abu)
+  if (category === 'new' || category === 'super_introv' || category === 'incomplete') {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 group relative cursor-help ${className}`}
+        title="⚪ New: Data Belum Lengkap"
+      >
+        <CheckCircle2
+          size={size}
+          className="fill-slate-400 text-white stroke-[2.2] transition-transform group-hover:scale-110"
+        />
+        {showLabel && (
+          <span className="text-[11px] font-bold tracking-tight text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+            New Alumni
           </span>
         )}
       </span>

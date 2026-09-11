@@ -134,32 +134,32 @@ export default function PrivacyPolicyPage() {
           </p>
           <div className="space-y-2 text-[11px]">
             <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/50">
-              <span className="font-extrabold text-amber-900">👑 Kategori Super Extrov (Crown Emas):</span>
+              <span className="font-extrabold text-amber-900">👑 Kategori Open Alumni:</span>
               <p className="text-slate-700 mt-1 leading-relaxed">
-                Diberikan kepada alumni yang melengkapi 100% data profil dan secara sukarela membuka seluruh informasi profilnya untuk seluruh rekan alumni. Alumni dapat mengatur akses buka/tutup secara manual maupun berbasis batas waktu sementara (1 hari, 3 hari, atau 7 hari).
+                Diberikan kepada alumni yang melengkapi 100% data profil dan secara sukarela membuka seluruh informasi profilnya untuk seluruh rekan alumni terverifikasi. Terbuka untuk semua alumni, dan alumni dapat mengatur akses buka/tutup secara manual maupun berbasis batas waktu sementara (1 hari, 3 hari, atau 7 hari).
               </p>
             </div>
             <div className="p-3 rounded-xl border border-blue-200 bg-blue-50/50">
-              <span className="font-extrabold text-blue-900">🔷 Kategori Extrov (Centang Biru):</span>
+              <span className="font-extrabold text-blue-900">🔷 Kategori Khusus Pengikut Saja (Connected Alumni) (Centang Biru):</span>
               <p className="text-slate-700 mt-1 leading-relaxed">
-                Diberikan kepada alumni yang melengkapi 100% data profil, namun membatasi informasi detail profilnya khusus hanya untuk rekan alumni yang telah mem-follow akunnya.
+                Diberikan kepada alumni yang melengkapi 100% data profil, dengan detail informasi profil khusus dapat diakses oleh rekan alumni yang menjadi koneksi atau telah saling mengikuti (followers).
               </p>
             </div>
             <div className="p-3 rounded-xl border border-slate-200 bg-slate-50">
-              <span className="font-extrabold text-slate-800">⚪ Kategori Introv (Centang Abu-abu):</span>
+              <span className="font-extrabold text-slate-800">⚪ Kategori Private Alumni (Centang Abu-abu):</span>
               <p className="text-slate-700 mt-1 leading-relaxed">
-                Diberikan kepada alumni yang melengkapi 100% data profil, namun mengunci profilnya menjadi privat (seluruh rincian kontak dan domisili disembunyikan).
+                Diberikan kepada alumni yang melengkapi 100% data profil, namun mengunci profilnya menjadi privat (seluruh rincian kontak dan domisili disembunyikan). Data tetap aman dan tidak dapat diakses pihak luar.
               </p>
             </div>
-            <div className="p-3 rounded-xl border border-slate-200 bg-white">
-              <span className="font-extrabold text-slate-600">⚪ Kategori Super Introv (Tanpa Icon):</span>
+            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50">
+              <span className="font-extrabold text-slate-800">⚪ Kategori New Alumni (Centang Abu-abu):</span>
               <p className="text-slate-700 mt-1 leading-relaxed">
-                Diberikan kepada alumni yang belum melengkapi data profil wajib (&lt; 100%). Alumni mendapatkan panduan serta pengingat berkala untuk melengkapi data agar meraih lencana verifikasi.
+                Diberikan kepada alumni yang baru bergabung atau belum melengkapi data profil wajib (&lt; 100%). Alumni mendapatkan panduan serta pengingat berkala untuk melengkapi data agar profil menjadi lengkap.
               </p>
             </div>
           </div>
           <p className="text-[11px] text-slate-600">
-            <strong>Transparansi Notifikasi Kunjungan:</strong> Alumni pada kategori Super Extrov dan Extrov menyetujui bahwa sistem mencatat dan mengirimkan pemberitahuan (inbox dan push notif) setiap kali profilnya dikunjungi oleh rekan alumni lain (termasuk informasi identitas pengunjung dan waktu kunjungan).
+            <strong>Transparansi Notifikasi Kunjungan:</strong> Alumni pada kategori Open Alumni dan Khusus Pengikut Saja (Connected Alumni) menyetujui bahwa sistem mencatat dan mengirimkan pemberitahuan (inbox dan push notif) setiap kali profilnya dikunjungi oleh rekan alumni lain (termasuk informasi identitas pengunjung dan waktu kunjungan).
           </p>
         </div>
 

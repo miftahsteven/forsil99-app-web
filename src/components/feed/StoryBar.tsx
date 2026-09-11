@@ -479,17 +479,17 @@ export function StoryBar() {
 
               {/* User Category Audience Guidance */}
               <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 text-[10.5px] text-slate-600 leading-snug">
-                {profile?.profileCategory === 'super_extrov' || profile?.profileVisibility === 'public' ? (
+                {profile?.profileCategory === 'open' || profile?.profileCategory === 'super_extrov' || profile?.profileVisibility === 'public' ? (
                   <span className="text-amber-800 font-medium">
-                    👑 Kategori <strong>Super Extrov</strong>: Cerita akan tampil ke seluruh rekan alumni Forsil 99.
+                    👑 Kategori <strong>Open Alumni</strong>: Cerita akan tampil ke seluruh rekan alumni Forsil 99.
                   </span>
-                ) : profile?.profileCategory === 'extrov' || profile?.profileVisibility === 'followers' ? (
+                ) : profile?.profileCategory === 'connected' || profile?.profileCategory === 'extrov' || profile?.profileVisibility === 'followers' ? (
                   <span className="text-sky-800 font-medium">
-                    🔷 Kategori <strong>Extrov</strong>: Cerita akan tampil untuk pengikut dan rekan sekelas Anda.
+                    🔷 Kategori <strong>Connected Alumni</strong>: Cerita akan tampil untuk pengikut dan rekan sekelas Anda.
                   </span>
                 ) : (
                   <span className="text-slate-600 font-medium">
-                    ⚪ Kategori <strong>Introv</strong>: Cerita hanya tampil untuk lingkaran pertemanan terdekat Anda.
+                    ⚪ Kategori <strong>Private Alumni</strong>: Cerita hanya tampil untuk lingkaran pertemanan terdekat Anda.
                   </span>
                 )}
               </div>
@@ -585,14 +585,24 @@ export function StoryBar() {
                           {activeItemIndex + 1}/{currentGroup.items.length}
                         </span>
                       )}
-                      {authorCategory === 'super_extrov' && (
-                        <span className="text-[10px]" title="Super Extrov (Terbuka untuk Semua)">
+                      {(authorCategory === 'open' || authorCategory === 'super_extrov') && (
+                        <span className="text-[10px]" title="Open Alumni (Terbuka untuk Semua)">
                           👑
                         </span>
                       )}
-                      {authorCategory === 'extrov' && (
-                        <span className="text-[10px]" title="Extrov (Pengikut & Sekelas)">
+                      {(authorCategory === 'connected' || authorCategory === 'extrov') && (
+                        <span className="text-[10px]" title="Khusus Pengikut Saja (Connected Alumni)">
                           🔷
+                        </span>
+                      )}
+                      {(authorCategory === 'private' || authorCategory === 'introv') && (
+                        <span className="text-[10px]" title="Private Alumni (Profil Privat)">
+                          ⚪
+                        </span>
+                      )}
+                      {authorCategory === 'new' && (
+                        <span className="text-[10px]" title="New Alumni (Data Belum Lengkap)">
+                          ⚪
                         </span>
                       )}
                     </div>

@@ -107,9 +107,12 @@ export function SellerRegistrationModal({
 
   const isProfileComplete = hasFullName && hasClass && hasContact && hasLocation;
 
-  // Syarat 2: Minimal kategori profil extrov (extrov atau super_extrov)
-  const isExtrovOrSuper =
-    profile?.profileCategory === 'extrov' || profile?.profileCategory === 'super_extrov';
+  // Syarat 2: Minimal kategori profil Connected Alumni (connected/open atau extrov/super_extrov)
+  const isConnectedOrOpen =
+    profile?.profileCategory === 'connected' ||
+    profile?.profileCategory === 'open' ||
+    profile?.profileCategory === 'extrov' ||
+    profile?.profileCategory === 'super_extrov';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,8 +122,8 @@ export function SellerRegistrationModal({
       return;
     }
 
-    if (!isExtrovOrSuper) {
-      toast.error('Minimal kategori profil harus Extrov untuk membuka lapak Seller 99.');
+    if (!isConnectedOrOpen) {
+      toast.error('Minimal kategori profil harus Connected Alumni untuk membuka lapak Seller 99.');
       return;
     }
 
@@ -270,23 +273,25 @@ export function SellerRegistrationModal({
             </div>
           )}
 
-          {/* B. PREREQUISITE CHECK 2: Minimal Kategori Profil Extrov */}
-          {isProfileComplete && !isExtrovOrSuper && (
+          {/* B. PREREQUISITE CHECK 2: Minimal Kategori Profil Connected Alumni */}
+          {isProfileComplete && !isConnectedOrOpen && (
             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-3">
               <div className="flex items-start gap-2.5">
                 <BadgeAlert size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm">
-                    Minimal Kategori Profil Extrov Diperlukan
+                    Minimal Kategori Profil Connected Alumni Diperlukan
                   </h3>
                   <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                     Kategori profil Anda saat ini adalah{' '}
                     <strong className="text-amber-900 uppercase">
-                      {profile?.profileCategory?.replace('_', ' ') || 'Introv'}
+                      {profile?.profileCategory === 'private' || profile?.profileCategory === 'introv'
+                        ? 'Private Alumni'
+                        : 'New Alumni (Data Belum Lengkap)'}
                     </strong>
                     . Pendaftaran Seller 99 mewajibkan profil minimal kategori{' '}
-                    <strong className="text-brand-primary">Extrov</strong> (atau{' '}
-                    <strong className="text-amber-600">Super Extrov</strong>) agar kontak WhatsApp dan identitas penjual dapat dihubungi serta diverifikasi oleh calon pembeli rekan alumni.
+                    <strong className="text-brand-primary">Connected Alumni</strong> (atau{' '}
+                    <strong className="text-amber-600">Open Alumni</strong>) agar kontak WhatsApp dan identitas penjual dapat dihubungi serta diverifikasi oleh calon pembeli rekan alumni.
                   </p>
                 </div>
               </div>
@@ -296,7 +301,7 @@ export function SellerRegistrationModal({
                   href="/profile/edit"
                   className="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors"
                 >
-                  <span>Ubah Kategori Profil ke Extrov di Sini</span>
+                  <span>Ubah Kategori Profil ke Connected Alumni di Sini</span>
                   <ArrowRight size={14} />
                 </Link>
               </div>
@@ -304,14 +309,18 @@ export function SellerRegistrationModal({
           )}
 
           {/* C. FORM PENDAFTARAN SELLER 99 */}
-          {isProfileComplete && isExtrovOrSuper && (
+          {isProfileComplete && isConnectedOrOpen && (
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Syarat Memenuhi Badge */}
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-2 text-xs text-emerald-900">
                 <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
                 <span>
                   Profil alumni Anda telah lengkap & berkategori{' '}
-                  <strong className="capitalize font-bold">{profile?.profileCategory?.replace('_', ' ')}</strong>. Anda memenuhi syarat menjadi Seller 99!
+                  <strong className="capitalize font-bold">
+                    {profile?.profileCategory === 'open' || profile?.profileCategory === 'super_extrov'
+                      ? 'Open Alumni (👑)'
+                      : 'Connected Alumni (🔷)'}
+                  </strong>. Anda memenuhi syarat menjadi Seller 99!
                 </span>
               </div>
 

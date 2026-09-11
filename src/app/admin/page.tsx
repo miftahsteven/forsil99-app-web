@@ -671,9 +671,9 @@ export default function AdminVerificationPage() {
                   const phone = alumniProfile?.whatsappNumber || alumniProfile?.whatsapp || owner?.phoneNumber || owner?.phone || shop.ownerPhone || '';
                   const domicile = alumniProfile?.city || alumniProfile?.currentAddress || shop.ownerCity || shop.ownerAddress || '-';
                   const shopAddress = shop.address || alumniProfile?.currentAddress || shop.ownerAddress || 'Belum mengisi alamat';
-                  const profileCat = alumniProfile?.profileCategory || alumniProfile?.profilePrivacyCategory || shop.ownerProfileCategory || 'extrov';
-                  const isSuperExtrov = profileCat === 'super_extrov';
-                  const isExtrov = profileCat === 'extrov';
+                  const profileCat = alumniProfile?.profileCategory || alumniProfile?.profilePrivacyCategory || shop.ownerProfileCategory || 'connected';
+                  const isOpenAlumni = profileCat === 'open' || profileCat === 'super_extrov';
+                  const isConnectedAlumni = profileCat === 'connected' || profileCat === 'extrov';
                   const profileId = alumniProfile?.id || alumniProfile?.userId || shop.ownerId || owner?.id;
                   const categoryName =
                     BUSINESS_CATEGORIES[shop.categoryIds?.[0]] || shop.categoryIds?.[0] || 'Aneka Usaha';
@@ -771,16 +771,16 @@ export default function AdminVerificationPage() {
                                 </div>
 
                                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                  {isSuperExtrov && (
+                                  {isOpenAlumni && (
                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 px-1.5 py-0.5 rounded">
                                       <Crown size={10} className="fill-amber-500" />
-                                      <span>Super Extrov</span>
+                                      <span>Open Alumni</span>
                                     </span>
                                   )}
-                                  {isExtrov && (
+                                  {isConnectedAlumni && (
                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300 px-1.5 py-0.5 rounded">
                                       <BadgeCheck size={11} className="fill-sky-500 text-white" />
-                                      <span>Extrov</span>
+                                      <span>Connected Alumni</span>
                                     </span>
                                   )}
                                   <span className="text-[10px] font-semibold text-slate-700 bg-slate-200/70 px-1.5 py-0.5 rounded">
@@ -1452,9 +1452,9 @@ export default function AdminVerificationPage() {
         const phone = alumniProfile?.whatsappNumber || alumniProfile?.whatsapp || owner?.phoneNumber || owner?.phone || selectedSeller.ownerPhone || '';
         const domicile = alumniProfile?.city || alumniProfile?.currentAddress || selectedSeller.ownerCity || selectedSeller.ownerAddress || '-';
         const shopAddress = selectedSeller.address || alumniProfile?.currentAddress || selectedSeller.ownerAddress || 'Belum mengisi alamat';
-        const profileCat = alumniProfile?.profileCategory || alumniProfile?.profilePrivacyCategory || selectedSeller.ownerProfileCategory || 'extrov';
-        const isSuperExtrov = profileCat === 'super_extrov';
-        const isExtrov = profileCat === 'extrov';
+        const profileCat = alumniProfile?.profileCategory || alumniProfile?.profilePrivacyCategory || selectedSeller.ownerProfileCategory || 'connected';
+        const isOpenAlumni = profileCat === 'open' || profileCat === 'super_extrov';
+        const isConnectedAlumni = profileCat === 'connected' || profileCat === 'extrov';
         const profileId = alumniProfile?.id || alumniProfile?.userId || selectedSeller.ownerId || owner?.id;
         const shopPhone = selectedSeller.contactPhone || selectedSeller.whatsapp || selectedSeller.ownerPhone || phone || '';
         const categoryName =
@@ -1552,16 +1552,16 @@ export default function AdminVerificationPage() {
                       </div>
 
                       <div className="flex items-center gap-2 flex-wrap text-xs">
-                        {isSuperExtrov && (
+                        {isOpenAlumni && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded">
                             <Crown size={12} className="fill-amber-500" />
-                            <span>Super Extrov (Memenuhi Syarat)</span>
+                            <span>Open Alumni (Memenuhi Syarat)</span>
                           </span>
                         )}
-                        {isExtrov && (
+                        {isConnectedAlumni && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-300 px-2 py-0.5 rounded">
                             <BadgeCheck size={12} className="fill-sky-500 text-white" />
-                            <span>Extrov (Memenuhi Syarat)</span>
+                            <span>Connected Alumni (Memenuhi Syarat)</span>
                           </span>
                         )}
                         <span className="font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
