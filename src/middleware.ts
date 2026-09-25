@@ -112,18 +112,6 @@ export async function middleware(request: NextRequest) {
         return redirectResponse;
       }
     }
-  } else {
-    // 2. Jika countdown dimatikan (sudah rilis / NEXT_PUBLIC_ENABLE_COUNTDOWN=false):
-    // Ketika user belum login membuka root /, langsung arahkan ke /login
-    if (!token && pathname === '/') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/login';
-      const redirectResponse = NextResponse.redirect(url);
-      if (hasExpiredToken) {
-        redirectResponse.cookies.delete('ruang59_web_token');
-      }
-      return redirectResponse;
-    }
   }
 
   const response = NextResponse.next();

@@ -37,6 +37,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const initAuth = useCallback(async () => {
+    // 1. Jika URL memiliki parameter expired atau logout, segera bersihkan dan reset state
+    const isExplicitLogout =
+      typeof window !== 'undefined' &&
+      (window.location.search.includes('expired') || window.location.search.includes('logout'));
+
+    if (isExplicitLogout) {
+      logoutUser();
+      setUser(null);
+      setProfile(null);
+      setIsLoading(false);
+      return;
+    }
+
     const token = getAccessToken();
     if (!token) {
       setUser(null);

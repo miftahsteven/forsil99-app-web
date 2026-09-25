@@ -213,6 +213,14 @@ export async function apiRequest<T = any>(
               detail: { message: data.message || 'Sesi telah kedaluwarsa. Silakan masuk kembali.' },
             })
           );
+          // Jika berada di halaman private dan session expired, arahkan ke /login?expired=1
+          if (
+            window.location.pathname !== '/login' &&
+            window.location.pathname !== '/register' &&
+            window.location.pathname !== '/countdown'
+          ) {
+            window.location.href = '/login?expired=1';
+          }
         }
       }
 

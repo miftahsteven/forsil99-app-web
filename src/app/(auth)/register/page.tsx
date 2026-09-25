@@ -355,10 +355,7 @@ export default function RegisterPage() {
     }
   };
 
-  if (
-    (isCountdownEnabled && !isReleased) ||
-    (!authLoading && isAuthenticated)
-  ) {
+  if (isCountdownEnabled && !isReleased) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
