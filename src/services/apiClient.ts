@@ -45,6 +45,14 @@ export function clearAccessToken(): void {
   localStorage.removeItem(PROFILE_KEY);
   try {
     document.cookie = `${TOKEN_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; SameSite=Lax`;
+    if (window.location.hostname) {
+      document.cookie = `${TOKEN_KEY}=; path=/; domain=${window.location.hostname}; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; SameSite=Lax`;
+      const domainParts = window.location.hostname.split('.');
+      if (domainParts.length >= 2) {
+        const rootDomain = domainParts.slice(-2).join('.');
+        document.cookie = `${TOKEN_KEY}=; path=/; domain=.${rootDomain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; SameSite=Lax`;
+      }
+    }
   } catch {}
 }
 

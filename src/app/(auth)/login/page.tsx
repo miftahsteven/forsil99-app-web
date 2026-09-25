@@ -11,6 +11,7 @@ import { Lock, Smartphone, Eye, EyeOff, Sparkles, ShieldCheck, Timer, ChevronRig
 import { useReleaseDate } from '@/hooks/useReleaseDate';
 import { WalkthroughTrigger } from '@/components/walkthrough/WalkthroughTrigger';
 import { LOGIN_WALKTHROUGH } from '@/config/walkthroughData';
+import { clearAccessToken } from '@/services/apiClient';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
@@ -132,6 +133,13 @@ export default function LoginPage() {
     return () => window.removeEventListener('pageshow', handlePageShow);
   }, [isAuthenticated, router]);
 
+  // Guard 4: Bersihkan sisa token kadaluwarsa dari storage jika user berada di halaman login dan belum terotentikasi
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      clearAccessToken();
+    }
+  }, [authLoading, isAuthenticated]);
+
   // Preload reCAPTCHA v3 script
   useEffect(() => {
     loadRecaptchaV3Script();
@@ -178,7 +186,8 @@ export default function LoginPage() {
     }
   };
 
-  if ((isCountdownEnabled && !isReleased) || authLoading || isAuthenticated) {
+  // Hanya tampilkan loading jika countdown belum rilis, atau jika user terbukti valid sudah login dan sedang diredirect ke /
+  if ((isCountdownEnabled && !isReleased) || (!authLoading && isAuthenticated)) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />

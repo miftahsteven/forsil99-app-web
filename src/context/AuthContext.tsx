@@ -45,11 +45,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Try fast load from cache
-    const cachedUser = getCachedUserData();
-    const cachedProfile = getCachedUserProfile();
-    if (cachedUser) setUser(cachedUser);
-    if (cachedProfile) setProfile(cachedProfile);
+    const isAuthRoute =
+      typeof window !== 'undefined' &&
+      (window.location.pathname === '/login' ||
+        window.location.pathname === '/register' ||
+        window.location.pathname.startsWith('/login') ||
+        window.location.pathname.startsWith('/register'));
+
+    // Try fast load from cache only on protected routes, never pre-hydrate on auth entry pages
+    if (!isAuthRoute) {
+      const cachedUser = getCachedUserData();
+      const cachedProfile = getCachedUserProfile();
+      if (cachedUser) setUser(cachedUser);
+      if (cachedProfile) setProfile(cachedProfile);
+    }
 
     // Verify & update with fresh data from backend
     try {
@@ -64,7 +73,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
       }
     } catch {
-      // Offline fallback: keep cached profile if exists
+      // Offline fallback: keep cached profile if exists on protected routes, but clear on auth pages
+      if (isAuthRoute) {
+        logoutUser();
+        setUser(null);
+        setProfile(null);
+      }
     } finally {
       setIsLoading(false);
     }
