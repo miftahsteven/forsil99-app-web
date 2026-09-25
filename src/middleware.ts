@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { parseFlexibleDate } from '@/utils/dateParser';
 
+import { isJwtExpired } from '@/utils/jwt';
+
 // Cache in-memory di sisi server (5 detik) untuk performa optimal & hemat kuota RTDB
 let cachedDateStr: string | null = null;
 let lastCheckTime = 0;
@@ -81,10 +83,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Cek token autentikasi di cookie
-  const token = request.cookies.get('ruang59_web_token')?.value;
+  // Cek token autentikasi di cookie (dan validasi masa aktifnya)
+  const rawToken = request.cookies.get('ruang59_web_token')?.value;
+  const hasExpiredToken = Boolean(rawToken && isJwtExpired(rawToken));
+  const token = rawToken && !hasExpiredToken ? rawToken : null;
 
-  // JIKA USER SUDAH LOGIN:
+  // JIKA USER SUDAH LOGIN (TOKEN VALID):
   // Lindungi user agar tidak masuk ke halaman /login atau /register (misal saat klik back button browser)
   if (token && (pathname === '/login' || pathname === '/register')) {
     const url = request.nextUrl.clone();
@@ -102,7 +106,11 @@ export async function middleware(request: NextRequest) {
       if (pathname === '/login' || pathname === '/register' || pathname === '/') {
         const url = request.nextUrl.clone();
         url.pathname = '/countdown';
-        return NextResponse.redirect(url);
+        const redirectResponse = NextResponse.redirect(url);
+        if (hasExpiredToken) {
+          redirectResponse.cookies.delete('ruang59_web_token');
+        }
+        return redirectResponse;
       }
     }
   } else {
@@ -111,11 +119,19 @@ export async function middleware(request: NextRequest) {
     if (!token && pathname === '/') {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
-      return NextResponse.redirect(url);
+      const redirectResponse = NextResponse.redirect(url);
+      if (hasExpiredToken) {
+        redirectResponse.cookies.delete('ruang59_web_token');
+      }
+      return redirectResponse;
     }
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  if (hasExpiredToken) {
+    response.cookies.delete('ruang59_web_token');
+  }
+  return response;
 }
 
 export const config = {

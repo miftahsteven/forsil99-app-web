@@ -17,9 +17,17 @@ export function getPlatformIdentifier(): string {
   return 'web';
 }
 
+import { isJwtExpired } from '@/utils/jwt';
+
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+  if (isJwtExpired(token)) {
+    clearAccessToken();
+    return null;
+  }
+  return token;
 }
 
 export function setAccessToken(token: string): void {
@@ -36,7 +44,7 @@ export function clearAccessToken(): void {
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(PROFILE_KEY);
   try {
-    document.cookie = `${TOKEN_KEY}=; path=/; max-age=0; SameSite=Lax`;
+    document.cookie = `${TOKEN_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; SameSite=Lax`;
   } catch {}
 }
 
@@ -185,6 +193,21 @@ export async function apiRequest<T = any>(
     }
 
     if (!response.ok) {
+      if (
+        response.status === 401 &&
+        !cleanEndpoint.includes('/auth/login') &&
+        !cleanEndpoint.includes('/auth/register')
+      ) {
+        clearAccessToken();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('ruang59_session_expired', {
+              detail: { message: data.message || 'Sesi telah kedaluwarsa. Silakan masuk kembali.' },
+            })
+          );
+        }
+      }
+
       const error: any = new Error(data.message || `Terjadi kesalahan pada server (${response.status})`);
       error.data = data;
       error.status = response.status;

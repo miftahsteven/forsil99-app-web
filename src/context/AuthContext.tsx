@@ -74,6 +74,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
   }, [initAuth]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleSessionExpired = () => {
+      logoutUser();
+      setUser(null);
+      setProfile(null);
+      setIsLoading(false);
+    };
+
+    window.addEventListener('ruang59_session_expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('ruang59_session_expired', handleSessionExpired);
+    };
+  }, []);
+
   const login = async (
     identifier: string,
     pass: string,

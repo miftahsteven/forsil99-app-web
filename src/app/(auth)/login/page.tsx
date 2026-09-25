@@ -11,7 +11,6 @@ import { Lock, Smartphone, Eye, EyeOff, Sparkles, ShieldCheck, Timer, ChevronRig
 import { useReleaseDate } from '@/hooks/useReleaseDate';
 import { WalkthroughTrigger } from '@/components/walkthrough/WalkthroughTrigger';
 import { LOGIN_WALKTHROUGH } from '@/config/walkthroughData';
-import { getAccessToken } from '@/services/apiClient';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
@@ -114,7 +113,7 @@ export default function LoginPage() {
 
   // Guard 2: Jika user SUDAH login, jangan biarkan mengakses halaman login lagi (redirect langsung ke /)
   useEffect(() => {
-    if (!authLoading && (isAuthenticated || Boolean(getAccessToken()))) {
+    if (!authLoading && isAuthenticated) {
       router.replace('/');
     }
   }, [isAuthenticated, authLoading, router]);
@@ -122,13 +121,16 @@ export default function LoginPage() {
   // Guard 3: Tangani Back/Forward cache browser (bfcache) jika user menekan Back button dari halaman utama
   useEffect(() => {
     const handlePageShow = (e: PageTransitionEvent) => {
-      if (e.persisted || Boolean(getAccessToken())) {
+      if (
+        (e.persisted || (typeof performance !== 'undefined' && (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'back_forward')) &&
+        isAuthenticated
+      ) {
         router.replace('/');
       }
     };
     window.addEventListener('pageshow', handlePageShow);
     return () => window.removeEventListener('pageshow', handlePageShow);
-  }, [router]);
+  }, [isAuthenticated, router]);
 
   // Preload reCAPTCHA v3 script
   useEffect(() => {
@@ -176,7 +178,7 @@ export default function LoginPage() {
     }
   };
 
-  if ((isCountdownEnabled && !isReleased) || authLoading || isAuthenticated || Boolean(getAccessToken())) {
+  if ((isCountdownEnabled && !isReleased) || authLoading || isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />

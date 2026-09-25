@@ -7,7 +7,6 @@ import { useAuth } from '@/context/AuthContext';
 import { AppButton } from '@/components/ui/AppButton';
 import { AppInput } from '@/components/ui/AppInput';
 import { fetchAlumniList, registerAlumniUser } from '@/services/authService';
-import { getAccessToken } from '@/services/apiClient';
 import { executeRecaptchaV3, loadRecaptchaV3Script } from '@/utils/recaptcha';
 import {
   User,
@@ -60,7 +59,7 @@ export default function RegisterPage() {
 
   // Guard 2: Jika user SUDAH login, jangan biarkan mengakses halaman register (redirect langsung ke /)
   useEffect(() => {
-    if (!authLoading && (isAuthenticated || Boolean(getAccessToken()))) {
+    if (!authLoading && isAuthenticated) {
       router.replace('/');
     }
   }, [isAuthenticated, authLoading, router]);
@@ -68,13 +67,16 @@ export default function RegisterPage() {
   // Guard 3: Tangani Back/Forward cache browser (bfcache) jika user menekan Back button dari halaman utama
   useEffect(() => {
     const handlePageShow = (e: PageTransitionEvent) => {
-      if (e.persisted || Boolean(getAccessToken())) {
+      if (
+        (e.persisted || (typeof performance !== 'undefined' && (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'back_forward')) &&
+        isAuthenticated
+      ) {
         router.replace('/');
       }
     };
     window.addEventListener('pageshow', handlePageShow);
     return () => window.removeEventListener('pageshow', handlePageShow);
-  }, [router]);
+  }, [isAuthenticated, router]);
 
   const [fullName, setFullName] = useState<string>('');
   const [nickname, setNickname] = useState<string>('');
@@ -356,8 +358,7 @@ export default function RegisterPage() {
   if (
     (isCountdownEnabled && !isReleased) ||
     authLoading ||
-    isAuthenticated ||
-    Boolean(getAccessToken())
+    isAuthenticated
   ) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
